@@ -15,9 +15,9 @@ export const dbConfig = {
   username: process.env.POSTGRESQL_USER ?? 'postgres',
   password: process.env.POSTGRESQL_PASSWORD ?? 'admin',
   database: process.env.POSTGRESQL_DATABASE ?? 'codev_osrs_db',
-  entities: [path.join(__dirname, '..', 'entities', '**/*.entity{.ts,.js}')],
+  entities: [path.join(__dirname, '..', '**/*.entity{.ts,.js}')],
   synchronize: false,
-  migrations: [path.join(__dirname, '..', 'migrations', '**/*{.ts,.js}')],
+  migrations: [path.join(__dirname, '..', 'migrations/*{.ts,.js}')],
   migrationsRun: true,
 };
 
