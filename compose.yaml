@@ -7,7 +7,7 @@ services:
       POSTGRES_DB: ${POSTGRESQL_DATABASE}
     image: postgres:${POSTGRESQL_VERSION}
     networks:
-      - bench-synergy-network
+      - codev-osrs-backend-network
     ports:
       - "${POSTGRESQL_PORT}:5432"
     volumes:
@@ -19,6 +19,6 @@ volumes:
   postgresql:
     driver: local
 networks:
-  bench-synergy-network:
+  codev-osrs-backend-network:
     driver: bridge
-    name: bench-synergy-network
+    name: codev-osrs-backend-network
