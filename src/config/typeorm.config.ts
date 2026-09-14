@@ -3,6 +3,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DataSource } from 'typeorm';
 
+// static import so Vercel's file tracer bundles pg (TypeORM loads it dynamically otherwise)
+import 'pg';
+
 config();
 
 const __filename = fileURLToPath(import.meta.url);
