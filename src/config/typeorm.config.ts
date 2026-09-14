@@ -21,7 +21,7 @@ export const dbConfig = {
   entities: [path.join(__dirname, '..', '**/*.entity{.ts,.js}')],
   synchronize: false,
   migrations: [path.join(__dirname, '..', 'migrations/*{.ts,.js}')],
-  migrationsRun: true,
+  migrationsRun: false,
 };
 
 export const AppDataSource = new DataSource(dbConfig);
