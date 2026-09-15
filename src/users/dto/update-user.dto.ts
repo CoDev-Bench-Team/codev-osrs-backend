@@ -5,35 +5,25 @@ import {
   IsOptional,
   MaxLength,
 } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '../entities/user.entity.js';
 
-/**
- * Partial payload for updating an existing user's record.
- *
- * Any provided field will replace the corresponding value on the target user.
- */
 export class UpdateUserDto {
-  /**
-   * The updated first name for the user.
-   */
+  @ApiPropertyOptional({ description: 'The updated first name for the user.', example: 'Ada' })
   @IsOptional()
   @IsNotEmpty()
   @IsAlpha()
   @MaxLength(50)
   firstName: string;
 
-  /**
-   * The updated last name for the user.
-   */
+  @ApiPropertyOptional({ description: 'The updated last name for the user.', example: 'Lovelace' })
   @IsOptional()
   @IsNotEmpty()
   @IsAlpha()
   @MaxLength(50)
   lastName: string;
 
-  /**
-   * The updated role assigned to the user.
-   */
+  @ApiPropertyOptional({ description: 'The updated role assigned to the user.', enum: UserRole, example: UserRole.EMPLOYEE })
   @IsOptional()
   @IsNotEmpty()
   @IsEnum(UserRole)

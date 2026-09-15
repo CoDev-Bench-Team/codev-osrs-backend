@@ -12,7 +12,7 @@ async function bootstrap() {
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('CoDev OSRS API')
-    .setDescription('API documentation for the CoDev OSRS backend')
+    .setDescription('API documentation for the CoDev Office Supplies Request System backend')
     .setVersion('1.0')
     .addTag('CoDev OSRS')
     .build();
