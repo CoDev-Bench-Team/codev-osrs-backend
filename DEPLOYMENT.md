@@ -55,7 +55,7 @@ All feature branch pushes and pull request events run the workflow's check job. 
 
 ## Local Deployment
 
-Local deployment uses the PostgreSQL service defined in `compose.yaml`. The Compose file does not build or run the NestJS API; it only provisions the database container.
+Local deployment uses the services defined in `compose.yaml`. Starting the Compose project brings up all dependent infrastructure needed for local development; the Compose file does not build or run the NestJS API itself.
 
 ### Prerequisites
 
@@ -82,10 +82,12 @@ Install dependencies, start PostgreSQL, apply migrations, and start the API:
 
 ```bash
 npm install
-docker compose up -d postgresql
+docker compose up -d
 npm run migration:run
 npm run start:dev
 ```
+
+`docker compose up -d` starts every service defined in `compose.yaml`, so newly added local dependencies are included automatically.
 
 The API listens on `http://localhost:3000` unless `PORT` is set. The local database can be stopped with:
 
