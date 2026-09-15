@@ -17,7 +17,14 @@ async function bootstrap() {
     .addTag('CoDev OSRS')
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('/', app, documentFactory);
+  const swaggerUiCdn = 'https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.14';
+  SwaggerModule.setup('/', app, documentFactory, {
+    customCssUrl: `${swaggerUiCdn}/swagger-ui.css`,
+    customJs: [
+      `${swaggerUiCdn}/swagger-ui-bundle.js`,
+      `${swaggerUiCdn}/swagger-ui-standalone-preset.js`,
+    ],
+  });
 
   await app.listen(process.env.PORT ?? 3000);
 }
