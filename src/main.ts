@@ -18,13 +18,19 @@ async function bootstrap() {
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, swaggerConfig);
   const swaggerUiCdn = 'https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.14';
-  SwaggerModule.setup('/', app, documentFactory, {
-    customCssUrl: `${swaggerUiCdn}/swagger-ui.css`,
-    customJs: [
-      `${swaggerUiCdn}/swagger-ui-bundle.js`,
-      `${swaggerUiCdn}/swagger-ui-standalone-preset.js`,
-    ],
-  });
+  const swaggerAssets = [
+    'swagger-ui.css',
+    'swagger-ui-bundle.js',
+    'swagger-ui-standalone-preset.js',
+  ];
+
+  for (const asset of swaggerAssets) {
+    app.getHttpAdapter().get(`/${asset}`, (_request, response) => {
+      response.redirect(`${swaggerUiCdn}/${asset}`);
+    });
+  }
+
+  SwaggerModule.setup('/', app, documentFactory);
 
   await app.listen(process.env.PORT ?? 3000);
 }
