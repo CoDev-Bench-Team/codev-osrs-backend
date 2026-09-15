@@ -29,11 +29,12 @@ Development follows a short-lived feature branch workflow tied to Linear tickets
 1. Create a feature branch from the latest `main` branch for the assigned Linear ticket.
 2. Name the branch using the Linear ticket code in the format `<ticket-code>`. The angle brackets are documentation placeholders and must not be included in the actual branch name. For example, use `ABC-123`, not `<ABC-123>`.
 3. Commit and push the work to the feature branch.
-4. Open a GitHub pull request targeting `main`.
-5. A different developer reviews the pull request and approves it.
-6. Merge the approved pull request into `main`.
-7. Delete the feature branch after the pull request is merged. If GitHub's automatic head-branch deletion is enabled, confirm that GitHub removed it; otherwise, delete it manually.
-8. The push to `main` runs the checks and, if they pass, triggers the production deployment.
+4. Open a GitHub pull request targeting `main`. The pull request title must use the format `<Linear Ticket ID> - <Linear Ticket Title>`, for example `ABC-123 - Add user search`. The angle brackets are placeholders and must not be included in the actual title.
+5. Write a pull request body that details the new changes so reviewers can understand the implementation and its scope.
+6. A different developer reviews the pull request and approves it.
+7. Merge the approved pull request into `main`.
+8. Delete the feature branch after the pull request is merged. If GitHub's automatic head-branch deletion is enabled, confirm that GitHub removed it; otherwise, delete it manually.
+9. The push to `main` runs the checks and, if they pass, triggers the production deployment.
 
 ```mermaid
 flowchart LR
