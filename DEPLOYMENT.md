@@ -81,7 +81,7 @@ Do not commit real credentials. The defaults in `src/config/typeorm.config.ts` a
 Install dependencies, start PostgreSQL, apply migrations, and start the API:
 
 ```bash
-npm ci
+npm install
 docker compose up -d postgresql
 npm run migration:run
 npm run start:dev
