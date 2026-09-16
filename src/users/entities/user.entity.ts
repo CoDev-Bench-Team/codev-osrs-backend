@@ -5,6 +5,9 @@ import {
   ManyToOne,
   JoinColumn,
   Index,
+  CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
 } from 'typeorm';
 import type { Relation } from 'typeorm';
 
@@ -13,37 +16,37 @@ export class User {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ length: 50 })
-  firstName: string;
-
-  @Column({ length: 50 })
-  lastName: string;
+  @Column({ length: 255, unique: true })
+  googleSubject: string;
 
   @Column({ length: 320, unique: true })
   email: string;
 
-  @Column({ length: 255 })
-  password: string;
+  @Column({ length: 100 })
+  fullName: string;
+
+  @Column({ length: 2048 })
+  avatarUrl: string;
 
   @Index()
   @Column({ length: 10 })
   role: UserRole;
 
-  @Column()
+  @CreateDateColumn()
   createdAt: Date;
 
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn()
   createdBy: Relation<User | null>;
 
-  @Column({ type: 'timestamp without time zone', nullable: true })
+  @UpdateDateColumn({ nullable: true })
   updatedAt: Date | null;
 
   @ManyToOne(() => User, { nullable: true })
   @JoinColumn()
   updatedBy: Relation<User | null>;
 
-  @Column({ type: 'timestamp without time zone', nullable: true })
+  @DeleteDateColumn({ nullable: true })
   deletedAt: Date | null;
 
   @ManyToOne(() => User, { nullable: true })

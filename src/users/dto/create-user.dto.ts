@@ -25,19 +25,29 @@ export class CreateUserDto {
   @MaxLength(50)
   lastName: string;
 
-  @ApiProperty({ description: "The user's email address used for contact and login.", example: 'ada@example.com' })
+  @ApiProperty({
+    description: "The user's email address used for contact and login.",
+    example: 'ada@example.com',
+  })
   @IsDefined()
   @IsEmail()
   email: string;
 
-  @ApiProperty({ description: 'The password for the new account.', example: 'correct-horse-battery-staple' })
+  @ApiProperty({
+    description: 'The password for the new account.',
+    example: 'correct-horse-battery-staple',
+  })
   @IsDefined()
   @IsNotEmpty()
   @MinLength(8)
   @MaxLength(30)
   password: string;
 
-  @ApiProperty({ description: 'The role assigned to the new user.', enum: UserRole, example: UserRole.ADMIN })
+  @ApiProperty({
+    description: 'The role assigned to the new user.',
+    enum: UserRole,
+    example: UserRole.ADMIN,
+  })
   @IsDefined()
   @IsNotEmpty()
   @IsEnum(UserRole)

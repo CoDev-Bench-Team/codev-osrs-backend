@@ -9,21 +9,31 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '../entities/user.entity.js';
 
 export class UpdateUserDto {
-  @ApiPropertyOptional({ description: 'The updated first name for the user.', example: 'Ada' })
+  @ApiPropertyOptional({
+    description: 'The updated first name for the user.',
+    example: 'Ada',
+  })
   @IsOptional()
   @IsNotEmpty()
   @IsAlpha()
   @MaxLength(50)
   firstName: string;
 
-  @ApiPropertyOptional({ description: 'The updated last name for the user.', example: 'Lovelace' })
+  @ApiPropertyOptional({
+    description: 'The updated last name for the user.',
+    example: 'Lovelace',
+  })
   @IsOptional()
   @IsNotEmpty()
   @IsAlpha()
   @MaxLength(50)
   lastName: string;
 
-  @ApiPropertyOptional({ description: 'The updated role assigned to the user.', enum: UserRole, example: UserRole.EMPLOYEE })
+  @ApiPropertyOptional({
+    description: 'The updated role assigned to the user.',
+    enum: UserRole,
+    example: UserRole.EMPLOYEE,
+  })
   @IsOptional()
   @IsNotEmpty()
   @IsEnum(UserRole)
