@@ -45,7 +45,8 @@ export class AuthService {
       email,
       email_verified: emailVerified,
       hd,
-      name,
+      given_name: givenName,
+      family_name: familyName,
       picture,
     } = payload;
 
@@ -86,7 +87,8 @@ export class AuthService {
       }
 
       user.email = normalizedEmail;
-      user.fullName = name ?? user.fullName;
+      user.firstName = givenName ?? user.firstName;
+      user.lastName = familyName ?? user.lastName;
       user.avatarUrl = picture ?? user.avatarUrl;
       return this.usersRepository.save(user);
     }
@@ -109,7 +111,8 @@ export class AuthService {
       }
 
       user.googleSubject = sub;
-      user.fullName = name ?? user.fullName;
+      user.firstName = givenName ?? user.firstName;
+      user.lastName = familyName ?? user.lastName;
       user.avatarUrl = picture ?? user.avatarUrl;
       return this.usersRepository.save(user);
     }
@@ -119,7 +122,8 @@ export class AuthService {
     const newUser = this.usersRepository.create({
       googleSubject: sub,
       email: normalizedEmail,
-      fullName: name,
+      firstName: givenName ?? '',
+      lastName: familyName ?? '',
       avatarUrl: picture,
       role: defaultRole as UserRole,
       createdAt: new Date(),

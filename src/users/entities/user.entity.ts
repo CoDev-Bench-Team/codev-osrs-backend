@@ -27,19 +27,30 @@ export class User {
   @Column({ length: 255, unique: true })
   googleSubject: string;
 
-  @ApiProperty({ description: "The user's email address.", example: 'ada@example.com' })
+  @ApiProperty({
+    description: "The user's email address.",
+    example: 'ada@example.com',
+  })
   @Column({ length: 320, unique: true })
   email: string;
 
-  @ApiProperty({ description: "The user's display name.", example: 'Ada Lovelace' })
-  @Column({ length: 100 })
-  fullName: string;
+  @ApiProperty({ description: "The user's first name.", example: 'Ada' })
+  @Column({ length: 50 })
+  firstName: string;
+
+  @ApiProperty({ description: "The user's last name.", example: 'Lovelace' })
+  @Column({ length: 50 })
+  lastName: string;
 
   @ApiProperty({ description: "The user's Google profile image URL." })
   @Column({ length: 2048 })
   avatarUrl: string;
 
-  @ApiProperty({ description: "The user's role.", enum: UserRole, example: UserRole.EMPLOYEE })
+  @ApiProperty({
+    description: "The user's role.",
+    enum: UserRole,
+    example: UserRole.EMPLOYEE,
+  })
   @Index()
   @Column({ length: 10 })
   role: UserRole;
