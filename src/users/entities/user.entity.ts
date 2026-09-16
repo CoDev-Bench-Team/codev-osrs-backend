@@ -17,6 +17,14 @@ export enum UserRole {
   EMPLOYEE = 'employee',
 }
 
+export enum UserLocation {
+  CEBU = 'Cebu',
+  BACOLOD = 'Bacolod',
+  MAKATI = 'Makati',
+  PASIG = 'Pasig',
+  DAVAO = 'Davao',
+}
+
 @Entity({ name: 'users' })
 export class User {
   @ApiProperty({ description: 'The unique user identifier.', example: 1 })
@@ -52,8 +60,17 @@ export class User {
     example: UserRole.EMPLOYEE,
   })
   @Index()
-  @Column({ length: 10 })
+  @Column({ length: 10, default: UserRole.EMPLOYEE })
   role: UserRole;
+
+  @ApiProperty({
+    description: "The user's closest office location.",
+    enum: UserLocation,
+    example: UserLocation.CEBU,
+  })
+  @Index()
+  @Column({ length: 10, default: UserLocation.CEBU })
+  location: UserLocation;
 
   @ApiProperty({ description: 'The date and time the user was created.' })
   @CreateDateColumn()
