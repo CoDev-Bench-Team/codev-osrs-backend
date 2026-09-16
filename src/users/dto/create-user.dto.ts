@@ -11,14 +11,22 @@ import { ApiProperty } from '@nestjs/swagger';
 import { UserRole } from '../entities/user.entity.js';
 
 export class CreateUserDto {
-  @ApiProperty({ description: "The user's first name.", example: 'Ada' })
+  @ApiProperty({
+    description: "The user's first name.",
+    example: 'Ada',
+    maxLength: 50,
+  })
   @IsDefined()
   @IsNotEmpty()
   @IsAlpha()
   @MaxLength(50)
   firstName: string;
 
-  @ApiProperty({ description: "The user's last name.", example: 'Lovelace' })
+  @ApiProperty({
+    description: "The user's last name.",
+    example: 'Lovelace',
+    maxLength: 50,
+  })
   @IsDefined()
   @IsNotEmpty()
   @IsAlpha()
@@ -28,6 +36,7 @@ export class CreateUserDto {
   @ApiProperty({
     description: "The user's email address used for contact and login.",
     example: 'ada@example.com',
+    format: 'email',
   })
   @IsDefined()
   @IsEmail()
@@ -36,6 +45,8 @@ export class CreateUserDto {
   @ApiProperty({
     description: 'The password for the new account.',
     example: 'correct-horse-battery-staple',
+    minLength: 8,
+    maxLength: 30,
   })
   @IsDefined()
   @IsNotEmpty()

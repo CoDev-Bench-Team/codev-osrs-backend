@@ -4,7 +4,15 @@ import { GoogleLoginDto } from './dto/google-login.dto.js';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { Public } from './public.decorator.js';
+import {
+  ApiCookieAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
+import { User } from '../users/entities/user.entity.js';
 
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -14,6 +22,8 @@ export class AuthController {
   ) {}
 
   @Public()
+  @ApiOperation({ summary: 'Signs in with a Google OAuth credential.' })
+  @ApiOkResponse({ description: 'The authenticated user.', type: User })
   @Post('google')
   async googleLogin(
     @Body() dto: GoogleLoginDto,
@@ -35,6 +45,13 @@ export class AuthController {
     return user;
   }
 
+  @ApiOperation({ summary: 'Clears the current session cookie.' })
+  @ApiOkResponse({
+    description: 'The session was cleared.',
+    schema: {
+      example: { success: true },
+    },
+  })
   @Public()
   @Post('logout')
   logout(@Res({ passthrough: true }) response: any) {
@@ -42,6 +59,9 @@ export class AuthController {
     return { success: true };
   }
 
+  @ApiOperation({ summary: 'Returns the currently authenticated user.' })
+  @ApiCookieAuth('session')
+  @ApiOkResponse({ description: 'The authenticated user.', type: User })
   @Get('me')
   me(@Req() request: any) {
     return request.user;

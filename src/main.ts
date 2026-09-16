@@ -29,6 +29,11 @@ async function bootstrap() {
       'API documentation for the CoDev Office Supplies Request System backend',
     )
     .setVersion('1.0')
+    .addCookieAuth('session', {
+      type: 'apiKey',
+      in: 'cookie',
+      name: 'session',
+    })
     .addTag('CoDev OSRS')
     .build();
   const documentFactory = () =>

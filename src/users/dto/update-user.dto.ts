@@ -12,6 +12,7 @@ export class UpdateUserDto {
   @ApiPropertyOptional({
     description: 'The updated first name for the user.',
     example: 'Ada',
+    maxLength: 50,
   })
   @IsOptional()
   @IsNotEmpty()
@@ -22,6 +23,7 @@ export class UpdateUserDto {
   @ApiPropertyOptional({
     description: 'The updated last name for the user.',
     example: 'Lovelace',
+    maxLength: 50,
   })
   @IsOptional()
   @IsNotEmpty()
