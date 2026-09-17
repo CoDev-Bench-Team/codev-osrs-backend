@@ -5,6 +5,7 @@ import { createObserveModule } from '@nestjs/observe';
 import { dbConfig } from './config/typeorm.config.js';
 import { UsersModule } from './users/users.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { AssetsModule } from './assets/assets.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -24,6 +25,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     }),
     UsersModule,
     AuthModule,
+    AssetsModule,
   ],
 })
 export class AppModule {}
