@@ -1,21 +1,21 @@
-import { Column, ManyToOne } from "typeorm";
+import { CreateDateColumn, DeleteDateColumn, ManyToOne, UpdateDateColumn } from "typeorm";
 import type { Relation } from "typeorm";
 import { User } from "../users/entities/user.entity.js";
 
 export abstract class AuditableEntity {
-    @Column({ type: 'timestamp', nullable: true })
-    createdAt: Date | null;
+    @CreateDateColumn()
+    createdAt: Date;
 
-    @Column({ type: 'varchar', nullable: true })
-    createdBy: string | null;
+    @ManyToOne(() => User, { nullable: true })
+    createdBy: Relation<User | null>;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @UpdateDateColumn({ nullable: true })
     updatedAt: Date | null;
 
     @ManyToOne(() => User, { nullable: true })
     updatedBy: Relation<User | null>;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @DeleteDateColumn({ nullable: true })
     deletedAt: Date | null;
 
     @ManyToOne(() => User, { nullable: true })

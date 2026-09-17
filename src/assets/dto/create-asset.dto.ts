@@ -6,6 +6,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -18,12 +19,14 @@ class AssetSpecDto implements AssetSpec {
   @IsDefined()
   @IsNotEmpty()
   @IsString()
-  title: string;
+  @MaxLength(255)
+  key: string;
 
   @ApiProperty({ description: 'The value of the custom spec field.', example: 'Black' })
   @IsDefined()
   @IsNotEmpty()
   @IsString()
+  @MaxLength(1000)
   value: string;
 }
 
@@ -31,20 +34,23 @@ export class CreateAssetDto {
   @ApiPropertyOptional({ description: 'URL of the uploaded item image.', example: 'https://cdn.example.com/assets/keyboard.png' })
   @IsOptional()
   @IsString()
+  @MaxLength(2048)
   imageUrl?: string;
 
   @ApiProperty({ description: 'The name of the item.', example: 'External Keyboard' })
   @IsDefined()
   @IsNotEmpty()
   @IsString()
+  @MaxLength(255)
   name: string;
 
   @ApiPropertyOptional({ description: 'The brand or model of the item.', example: 'Logitech MX Keys' })
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   model?: string;
 
-  @ApiProperty({ description: 'The category the item belongs to.', enum: AssetCategory, example: AssetCategory.KEYBOARDS })
+  @ApiProperty({ description: 'The category the item belongs to.', enum: AssetCategory, example: AssetCategory.LAPTOP })
   @IsDefined()
   @IsNotEmpty()
   @IsEnum(AssetCategory)

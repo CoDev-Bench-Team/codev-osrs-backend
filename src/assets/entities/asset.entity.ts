@@ -2,12 +2,15 @@ import { Entity, Column, PrimaryGeneratedColumn, Index } from "typeorm";
 import { AuditableEntity } from '../../common/auditable.base.js';
 
 export enum AssetCategory {
-    LAPTOPS = 'Laptops',
-    MONITORS = 'Monitors',
-    KEYBOARDS = 'Keyboards',
+    LAPTOP = 'Laptop',
+    HEADSET = 'Headset',
+    MONITOR = 'Monitor',
+    PHONE = 'Phone',
+    UPS = 'UPS',
     MICE = 'Mice',
-    HEADSETS = 'Headsets',
-    CABLES = 'Cables',
+    WIFI = 'Wifi',
+    TYPECHUB = 'Type C Hub',
+    OTHER = 'Other Devices'
 }
 
 export enum AssetLocation {
@@ -19,7 +22,7 @@ export enum AssetLocation {
 }
 
 export interface AssetSpec {
-    title: string;
+    key: string;
     value: string;
 }
 
@@ -32,10 +35,10 @@ export class Asset extends AuditableEntity {
     @Column({ type: 'enum', enum: AssetCategory })
     type: AssetCategory;
 
-    @Column()
+    @Column({ type: 'varchar', length: 255 })
     name: string;
 
-    @Column({ type: 'varchar', nullable: true })
+    @Column({ type: 'varchar', length: 255, nullable: true })
     model: string | null;
 
     @Index()
@@ -45,7 +48,7 @@ export class Asset extends AuditableEntity {
     @Column()
     lowQtyAlert: number;
 
-    @Column({ type: 'varchar', nullable: true })
+    @Column({ type: 'varchar', length: 2048, nullable: true })
     imageUrl: string | null;
 
     @Column({ type: 'jsonb', default: [], nullable: true })

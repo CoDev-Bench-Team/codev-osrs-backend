@@ -21,14 +21,6 @@ export class AssetsService {
 
 
     //
-    // Returns all Assets in DB
-    //
-    async list(): Promise<AssetWithQuantity[]> {
-        const assets = await this.assetRepository.find();
-        return this.attachQuantities(assets);
-    }
-
-    //
     // Returns paginated results given the current page and how many items per page
     //
     async paginate({ page = 1, limit = 10 }: PaginatedAssetsQueryDto): Promise<PaginatedResult<AssetWithQuantity>> {

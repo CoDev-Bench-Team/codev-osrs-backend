@@ -21,15 +21,8 @@ import { Public } from '../auth/public.decorator.js';
 export class AssetsController {
   constructor(private readonly assetsService: AssetsService) {}
 
-  @ApiOperation({ summary: 'Retrieves all assets in the system.' })
-  @Get()
-  @Public()
-  list() {
-    return this.assetsService.list();
-  }
-
   @ApiOperation({ summary: 'Retrieves a paginated list of assets.' })
-  @Get('paginated')
+  @Get()
   paginate(@Query() paginatedAssetsQueryDto: PaginatedAssetsQueryDto) {
     return this.assetsService.paginate(paginatedAssetsQueryDto);
   }
