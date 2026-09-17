@@ -26,7 +26,7 @@ export interface AssetSpec {
     value: string;
 }
 
-@Entity()
+@Entity({ name: 'assets' })
 export class Asset extends AuditableEntity {
     @PrimaryGeneratedColumn()
     id: number;
@@ -48,8 +48,8 @@ export class Asset extends AuditableEntity {
     @Column()
     lowQtyAlert: number;
 
-    @Column({ type: 'varchar', length: 2048, nullable: true })
-    imageUrl: string | null;
+    @Column({ type: 'text', nullable: true })
+    imageBase64: string | null;
 
     @Column({ type: 'jsonb', default: [], nullable: true })
     specs?: AssetSpec[];

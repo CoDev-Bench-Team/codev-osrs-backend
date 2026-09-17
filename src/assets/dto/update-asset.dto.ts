@@ -28,11 +28,13 @@ class AssetSpecDto implements AssetSpec {
 }
 
 export class UpdateAssetDto {
-  @ApiPropertyOptional({ description: 'URL of the uploaded item image.', example: 'https://cdn.example.com/assets/keyboard.png' })
+  @ApiPropertyOptional({
+    description: 'Base64-encoded image data for the item, optionally prefixed with a data URI scheme (e.g. "data:image/png;base64,...").',
+    example: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  })
   @IsOptional()
   @IsString()
-  @MaxLength(2048)
-  imageUrl?: string;
+  imageBase64?: string;
 
   @ApiPropertyOptional({ description: 'The name of the item.', example: 'External Keyboard' })
   @IsOptional()

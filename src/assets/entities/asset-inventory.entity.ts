@@ -10,7 +10,7 @@ export enum AssetInventoryStatus {
     ASSIGNED = 'Assigned',
 }
 
-@Entity()
+@Entity({ name: 'asset_inventories' })
 @Index(['asset', 'status'])
 export class AssetInventory extends AuditableEntity {
     @PrimaryGeneratedColumn()
