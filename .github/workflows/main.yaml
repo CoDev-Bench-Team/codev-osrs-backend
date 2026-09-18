@@ -59,4 +59,4 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
       - name: Deploy to Vercel
-        run: vercel deploy --prod --yes --token="$VERCEL_TOKEN"
+        run: vercel deploy --prod --yes --force --token="$VERCEL_TOKEN"
