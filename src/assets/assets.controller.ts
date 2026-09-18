@@ -15,6 +15,7 @@ import { CreateAssetDto } from './dto/create-asset.dto.js';
 import { UpdateAssetDto } from './dto/update-asset.dto.js';
 import { PaginatedAssetsQueryDto } from './dto/paginated-assets-query.dto.js';
 import { Public } from '../auth/public.decorator.js';
+import { ApiValidationProblemResponse } from '../common/api-validation-problem-response.decorator.js';
 
 @ApiTags('Assets')
 @Controller('assets')
@@ -27,20 +28,28 @@ export class AssetsController {
     return this.assetsService.paginate(paginatedAssetsQueryDto);
   }
 
-  @ApiOperation({ summary: 'Fetches a single asset by its numeric identifier.' })
+  @ApiOperation({
+    summary: 'Fetches a single asset by its numeric identifier.',
+  })
   @Get(':id')
   find(@Param('id', ParseIntPipe) id: number) {
     return this.assetsService.find(id);
   }
 
-  @ApiOperation({ summary: 'Creates a new asset using the supplied item details.' })
+  @ApiOperation({
+    summary: 'Creates a new asset using the supplied item details.',
+  })
+  @ApiValidationProblemResponse(CreateAssetDto)
   @Post()
   @Public()
   create(@Body() createAssetDto: CreateAssetDto) {
     return this.assetsService.create(createAssetDto);
   }
 
-  @ApiOperation({ summary: 'Updates an existing asset with the supplied item details.' })
+  @ApiOperation({
+    summary: 'Updates an existing asset with the supplied item details.',
+  })
+  @ApiValidationProblemResponse(UpdateAssetDto)
   @Patch(':id')
   update(
     @Param('id', ParseIntPipe) id: number,

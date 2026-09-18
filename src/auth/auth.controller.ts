@@ -11,6 +11,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { User } from '../users/entities/user.entity.js';
+import { ApiValidationProblemResponse } from '../common/api-validation-problem-response.decorator.js';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -23,6 +24,7 @@ export class AuthController {
 
   @Public()
   @ApiOperation({ summary: 'Signs in with a Google OAuth credential.' })
+  @ApiValidationProblemResponse(GoogleLoginDto)
   @ApiOkResponse({ description: 'The authenticated user.', type: User })
   @Post('google')
   async googleLogin(
