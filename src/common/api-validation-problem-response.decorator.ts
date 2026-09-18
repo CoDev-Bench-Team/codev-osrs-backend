@@ -1,6 +1,27 @@
 import type { Type } from '@nestjs/common';
 import { getMetadataStorage, type ValidationArguments } from 'class-validator';
-import { ApiProblemResponse } from 'nest-problem-details-filter/swagger';
+import { ApiResponse } from '@nestjs/swagger';
+
+const problemDetailsSchema = {
+  type: 'object',
+  required: ['type', 'title', 'status'],
+  properties: {
+    type: { type: 'string', example: 'validation-error' },
+    title: { type: 'string', example: 'Validation Failed' },
+    status: { type: 'integer', example: 400 },
+    errors: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['detail', 'pointer'],
+        properties: {
+          detail: { type: 'string' },
+          pointer: { type: 'string', example: '#/name' },
+        },
+      },
+    },
+  },
+};
 
 type ValidationMetadataLike = {
   propertyName: string;
@@ -59,18 +80,22 @@ const createValidationErrors = (bodyType: Type<unknown>) => {
 };
 
 export const ApiValidationProblemResponse = (bodyType?: Type<unknown>) =>
-  ApiProblemResponse({
+  ApiResponse({
     status: 400,
-    title: 'Validation Failed',
     description: 'The request contains invalid data.',
-    examples: {
-      validationError: {
-        summary: 'Validation errors with JSON Pointers',
-        value: {
-          type: 'validation-error',
-          title: 'Validation Failed',
-          status: 400,
-          errors: bodyType ? createValidationErrors(bodyType) : [],
+    content: {
+      'application/problem+json': {
+        schema: problemDetailsSchema,
+        examples: {
+          validationError: {
+            summary: 'Validation errors with JSON Pointers',
+            value: {
+              type: 'validation-error',
+              title: 'Validation Failed',
+              status: 400,
+              errors: bodyType ? createValidationErrors(bodyType) : [],
+            },
+          },
         },
       },
     },
