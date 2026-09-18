@@ -21,6 +21,7 @@ import {
 } from '@nestjs/swagger';
 import { Roles } from '../auth/roles.decorator.js';
 import { User } from './entities/user.entity.js';
+import { ApiValidationProblemResponse } from '../common/api-validation-problem-response.decorator.js';
 
 @ApiTags('Users')
 @Controller('users')
@@ -60,6 +61,7 @@ export class UsersController {
   @ApiOperation({
     summary: 'Creates a new user using the supplied account details.',
   })
+  @ApiValidationProblemResponse(CreateUserDto)
   @ApiCreatedResponse({ description: 'The newly created user.', type: User })
   @Roles('admin')
   @Post()
@@ -69,6 +71,7 @@ export class UsersController {
 
   @ApiCookieAuth('session')
   @ApiOperation({ summary: "Updates an existing user's profile information." })
+  @ApiValidationProblemResponse(UpdateUserDto)
   @ApiParam({
     name: 'id',
     description: 'The numeric user identifier.',
