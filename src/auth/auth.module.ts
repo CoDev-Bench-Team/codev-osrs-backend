@@ -8,6 +8,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { RolesGuard } from './roles.guard.js';
 import { AuthGuard } from './auth.guard.js';
+import { MailerModule } from '../mailer/mailer.module.js';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { AuthGuard } from './auth.guard.js';
         },
       }),
     }),
+    MailerModule
   ],
   controllers: [AuthController],
   providers: [
