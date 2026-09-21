@@ -1,21 +1,30 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
-import { Request, RequestStatus, TimelineEvent } from './entities/request.entity.js';
+import { Repository } from 'typeorm';
+import {
+  Request,
+  RequestAsset,
+  RequestStatus,
+  TimelineEvent,
+} from './entities/request.entity.js';
 import { User } from '../users/entities/user.entity.js';
-import { Asset, AssetLocation } from '../assets/entities/asset.entity.js';
+import { Asset } from '../assets/entities/asset.entity.js';
+import {
+  AssetInventory,
+  AssetInventoryStatus,
+} from '../assets/entities/asset-inventory.entity.js';
+import { MailerService } from '../mailer/mailer.service.js';
 import { CreateRequestDto } from './dto/create-request.dto.js';
 import { UpdateRequestDto } from './dto/update-request.dto.js';
 
-const RELATIONS = { requester: true, approvedBy: true };
+const RELATIONS = { requestor: true, approvedBy: true };
 
 @Injectable()
 export class RequestsService {
   constructor(
     @InjectRepository(Request)
     private readonly requestsRepository: Repository<Request>,
-    @InjectRepository(Asset)
-    private readonly assetsRepository: Repository<Asset>,
+    private readonly mailerService: MailerService,
   ) {}
 
   list(): Promise<Request[]> {
@@ -38,38 +47,100 @@ export class RequestsService {
 
   async create(
     createRequestDto: CreateRequestDto,
-    requester: User,
+    requestor: User,
   ): Promise<Request> {
-    // NOTE: this validates that the requested assets exist, but does not yet
-    // deduct stock on submission (see the process flow's inventory rules) —
-    // that needs the 'assets' resource's AssetInventory, which is separate
-    // follow-up work.
-    await this.validateAssetsExist(createRequestDto.items);
+    const assetIds = createRequestDto.items.map((item) => item.assetId);
+    if (new Set(assetIds).size !== assetIds.length) {
+      throw new BadRequestException(
+        'Each asset may only appear once per request.',
+      );
+    }
 
-    const initialEvent: TimelineEvent = {
-      status: RequestStatus.PENDING_APPROVAL,
-      at: new Date().toISOString(),
-      byUserId: requester.id,
-    };
+    // Validates every line, reserves stock, and creates the request in one
+    // atomic transaction: either all lines succeed and stock is decremented
+    // for each, or nothing is created and nothing is reserved (FR-005/006).
+    // Reservation locks the AssetInventory rows being claimed (`FOR UPDATE`,
+    // in a stable id order) so concurrent submits for the last unit can't
+    // both succeed (ADR-0002).
+    const savedRequest = await this.requestsRepository.manager.transaction(
+      async (manager) => {
+        const requestItems: RequestAsset[] = [];
 
-    // `User.location` (`UserLocation`) and `Request.location` (`AssetLocation`)
-    // are separate enums that happen to share the same office names/values.
-    const location =
-      createRequestDto.location ?? (requester.location as unknown as AssetLocation);
+        for (const line of createRequestDto.items) {
+          const asset = await manager.findOneBy(Asset, { id: line.assetId });
+          if (!asset) {
+            throw new BadRequestException(
+              `Asset with ID '${line.assetId}' could not be found.`,
+            );
+          }
+          if (!asset.isActive) {
+            throw new BadRequestException(
+              `Asset '${asset.name}' is not active and cannot be requested.`,
+            );
+          }
 
-    const newRequest = this.requestsRepository.create({
-      ...createRequestDto,
-      location,
-      requester,
-      createdBy: requester,
-      timeline: [initialEvent],
-      displayId: 'PENDING', // replaced with a real ID once the row has one
-    });
+          const availableUnits = await manager
+            .createQueryBuilder(AssetInventory, 'inventory')
+            .setLock('pessimistic_write')
+            .where('inventory.assetId = :assetId', { assetId: asset.id })
+            .andWhere('inventory.status = :status', {
+              status: AssetInventoryStatus.AVAILABLE,
+            })
+            .orderBy('inventory.id', 'ASC')
+            .take(line.quantity)
+            .getMany();
 
-    const savedRequest = await this.requestsRepository.save(newRequest);
-    savedRequest.displayId = `REQ-${savedRequest.createdAt.getFullYear()}-${savedRequest.id}`;
+          if (availableUnits.length < line.quantity) {
+            throw new BadRequestException(
+              `Insufficient stock for '${asset.name}': requested ${line.quantity}, ${availableUnits.length} available.`,
+            );
+          }
 
-    return this.requestsRepository.save(savedRequest);
+          await manager.update(
+            AssetInventory,
+            availableUnits.map((unit) => unit.id),
+            { status: AssetInventoryStatus.RESERVED },
+          );
+
+          requestItems.push({
+            assetId: asset.id,
+            itemName: asset.name,
+            quantity: line.quantity,
+          });
+        }
+
+        const initialEvent: TimelineEvent = {
+          status: RequestStatus.PENDING_APPROVAL,
+          at: new Date().toISOString(),
+          byUserId: requestor.id,
+        };
+
+        const newRequest = manager.create(Request, {
+          purpose: createRequestDto.purpose,
+          items: requestItems,
+          requestor,
+          createdBy: requestor,
+          timeline: [initialEvent],
+          displayId: 'PENDING', // replaced with a real ID once the row has one
+        });
+
+        const inserted = await manager.save(newRequest);
+        inserted.displayId = `REQ-${inserted.createdAt.getFullYear()}-${inserted.id}`;
+
+        return manager.save(inserted);
+      },
+    );
+
+    // Sent (and logged) after the transaction commits — a delivery failure
+    // must not roll back an already-valid status change.
+    await this.mailerService.sendRequestSubmittedEmail(
+      savedRequest.id,
+      requestor.firstName,
+      requestor.email,
+      savedRequest.items,
+    );
+
+    return savedRequest;
   }
 
   async update(
@@ -81,10 +152,6 @@ export class RequestsService {
       throw new NotFoundException(
         `Request with ID '${id}' could not be found.`,
       );
-    }
-
-    if (updateRequestDto.items) {
-      await this.validateAssetsExist(updateRequestDto.items);
     }
 
     await this.requestsRepository.save({
@@ -104,24 +171,5 @@ export class RequestsService {
     }
 
     return this.requestsRepository.softRemove(requestToDelete);
-  }
-
-  private async validateAssetsExist(
-    items: { assetId: number }[],
-  ): Promise<void> {
-    const assetIds = [...new Set(items.map((item) => item.assetId))];
-    const foundAssets = await this.assetsRepository.findBy({
-      id: In(assetIds),
-    });
-
-    if (foundAssets.length === assetIds.length) {
-      return;
-    }
-
-    const foundIds = new Set(foundAssets.map((asset) => asset.id));
-    const missingIds = assetIds.filter((id) => !foundIds.has(id));
-    throw new BadRequestException(
-      `Asset(s) with ID(s) ${missingIds.join(', ')} could not be found.`,
-    );
   }
 }

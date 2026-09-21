@@ -53,4 +53,8 @@ export class Asset extends AuditableEntity {
 
     @Column({ type: 'jsonb', default: [], nullable: true })
     specs?: AssetSpec[];
+
+    // Inactive items cannot be added to new requests (spec FR-005).
+    @Column({ type: 'boolean', default: true })
+    isActive: boolean;
 }
