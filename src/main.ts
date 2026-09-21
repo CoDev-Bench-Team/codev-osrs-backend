@@ -1,13 +1,19 @@
-import { NestFactory } from '@nestjs/core';
+import { HttpAdapterHost, NestFactory } from '@nestjs/core';
 import { AppModule, ObserveInstrument } from './app.module.js';
 import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import {
+  ProblemDetailsFilter,
+  toValidationProblemDetails,
+} from './common/problem-details.filter.js';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     instrument: ObserveInstrument,
   });
+
+  app.useGlobalFilters(new ProblemDetailsFilter(app.get(HttpAdapterHost)));
 
   app.use(cookieParser());
 
@@ -15,6 +21,7 @@ async function bootstrap() {
     new ValidationPipe({
       whitelist: true,
       transform: true,
+      exceptionFactory: (errors) => toValidationProblemDetails(errors),
     }),
   );
 
