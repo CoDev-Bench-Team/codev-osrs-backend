@@ -27,8 +27,11 @@ export class RequestsService {
     private readonly mailerService: MailerService,
   ) {}
 
-  list(): Promise<Request[]> {
-    return this.requestsRepository.find({ relations: RELATIONS });
+  async list(): Promise<Request[]> {
+    const requests = await this.requestsRepository.find({
+      relations: RELATIONS,
+    });
+    return this.attachAvailableStock(requests);
   }
 
   async find(id: number): Promise<Request> {
@@ -42,7 +45,8 @@ export class RequestsService {
       );
     }
 
-    return request;
+    const [requestWithStock] = await this.attachAvailableStock([request]);
+    return requestWithStock;
   }
 
   async create(
@@ -173,5 +177,46 @@ export class RequestsService {
     }
 
     return this.requestsRepository.softRemove(requestToDelete);
+  }
+
+  /**
+   * Attaches each item's current available stock (same counting logic as
+   * `AssetsService.attachQuantities()`: `AssetInventory` rows with status
+   * `AVAILABLE`, grouped by asset) — per PR #79 review, so an admin view can
+   * show live stock alongside a request's line items without a second
+   * round-trip.
+   */
+  private async attachAvailableStock(requests: Request[]): Promise<Request[]> {
+    const assetIds = [
+      ...new Set(requests.flatMap((r) => r.items.map((item) => item.asset.id))),
+    ];
+    if (!assetIds.length) {
+      return requests;
+    }
+
+    const counts = await this.requestsRepository.manager
+      .createQueryBuilder(AssetInventory, 'inventory')
+      .select('inventory.assetId', 'assetId')
+      .addSelect('COUNT(inventory.id)', 'count')
+      .where('inventory.assetId IN (:...assetIds)', { assetIds })
+      .andWhere('inventory.status = :status', {
+        status: AssetInventoryStatus.AVAILABLE,
+      })
+      .groupBy('inventory.assetId')
+      .getRawMany<{ assetId: number; count: string }>();
+
+    const stockByAssetId = new Map(
+      counts.map(({ assetId, count }) => [assetId, Number(count)]),
+    );
+
+    for (const request of requests) {
+      for (const item of request.items) {
+        Object.assign(item, {
+          availableStock: stockByAssetId.get(item.asset.id) ?? 0,
+        });
+      }
+    }
+
+    return requests;
   }
 }
