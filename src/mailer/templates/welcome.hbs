@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Welcome to CoDev OSRS</title>
+        <style>
+            body {
+                margin: 0;
+                padding: 0;
+                background-color: #f1f2f5;
+                color: #2d3035;
+                font-family: Arial, Helvetica, sans-serif;
+            }
+            a {
+                color: #cc2f4a;
+            }
+            @media only screen and (max-width: 640px) {
+                .page-padding {
+                    padding: 24px 12px !important;
+                }
+                .content-padding {
+                    padding: 42px 28px 36px !important;
+                }
+                .title {
+                    font-size: 30px !important;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+            <tr>
+                <td class="page-padding" align="center" style="padding: 34px 20px 30px;">
+                    <table role="presentation" width="100%" style="max-width: 600px;" cellspacing="0" cellpadding="0" border="0">
+                        <tr>
+                            <td align="center" style="padding: 0 0 30px;">
+                                <div style="color: #cc2f4a; font-size: 27px; font-weight: bold; letter-spacing: -1px;">
+                                    CoDev<span style="font-weight: normal;"> OSRS</span>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="overflow: hidden; border-radius: 7px; background-color: #ffffff; box-shadow: 0 3px 12px rgba(45, 48, 53, 0.09);">
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                    <tr>
+                                        <td align="center" height="125" style="height: 125px; background-color: #cc2f4a; color: #ffffff;">
+                                            <div style="font-size: 17px; font-weight: bold; letter-spacing: 3px; text-transform: uppercase;">Your portal is ready</div>
+                                            <div style="margin-top: 10px; font-size: 13px; opacity: 0.9;">Welcome to the CoDev OSRS team</div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="content-padding" style="padding: 48px 54px 42px;">
+                                            <h1 class="title" style="margin: 0 0 22px; color: #2d3035; font-size: 32px; line-height: 1.2;">Welcome to CoDev OSRS!</h1>
+                                            <p style="margin: 0 0 4px; font-size: 15px; line-height: 1.6;">Hi {{name}},</p>
+                                            <p style="margin: 0; font-size: 15px; line-height: 1.6;">You may now request office supplies from our portal.</p>
+
+                                            <div style="height: 1px; margin: 24px 0; background-color: #e1e2e4;"></div>
+
+                                            <p style="margin: 0 0 22px; font-size: 15px; font-weight: bold; line-height: 1.5;">Here's your portal information:</p>
+                                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                                <tr>
+                                                    <td style="padding: 0 12px 16px 0; color: #85888e; font-size: 13px;">Portal URL</td>
+                                                    <td style="padding: 0 0 16px; font-size: 13px; word-break: break-word;">{{portalUrl}}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding: 0 12px 16px 0; color: #85888e; font-size: 13px;">Role</td>
+                                                    <td style="padding: 0 0 16px; font-size: 13px; word-break: break-word;">{{role}}</td>
+                                                </tr>
+                                            </table>
+
+                                            <a href="{{portalUrl}}" style="display: inline-block; margin-top: 12px; padding: 13px 25px; border-radius: 5px; background-color: #cc2f4a; color: #ffffff; font-size: 15px; font-weight: bold; text-decoration: none;">Get Started</a>
+
+                                            <div style="height: 1px; margin: 25px 0 22px; background-color: #e1e2e4;"></div>
+
+                                            <p style="margin: 0; font-size: 15px; line-height: 1.55;">Thanks for joining us.<br />&ndash; The CoDev OSRS Team</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td align="center" style="padding: 30px 10px 0; color: #777b82; font-size: 13px; line-height: 1.55;">
+                                <strong style="color: #2d3035;">Questions?</strong><br />
+                                Reply to this email if you need help getting started.
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+</html>

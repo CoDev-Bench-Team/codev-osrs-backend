@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { User, UserRole } from '../users/entities/user.entity.js';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { MailerService } from '../mailer/mailer.service.js';
 
 @Injectable()
 export class AuthService {
@@ -16,6 +17,7 @@ export class AuthService {
   constructor(
     private readonly config: ConfigService,
     @InjectRepository(User) private readonly usersRepository: Repository<User>,
+    private readonly mailerService: MailerService
   ) {}
 
   async authenticateGoogle(credential: string): Promise<User> {
@@ -128,6 +130,8 @@ export class AuthService {
       role: defaultRole as UserRole,
       createdAt: new Date(),
     });
+
+    await this.mailerService.sendWelcomeEmail(newUser);
 
     return this.usersRepository.save(newUser);
   }
