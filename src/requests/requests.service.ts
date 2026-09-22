@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Request, RequestStatus, TimelineEvent } from './entities/request.entity.js';
 import { RequestAsset } from './entities/request-asset.entity.js';
 import { User } from '../users/entities/user.entity.js';
@@ -12,6 +12,11 @@ import {
 import { MailerService } from '../mailer/mailer.service.js';
 import { CreateRequestDto } from './dto/create-request.dto.js';
 import { UpdateRequestDto } from './dto/update-request.dto.js';
+import {
+  PaginatedRequestsQueryDto,
+  RequestSortOrder,
+} from './dto/paginated-requests-query.dto.js';
+import { PaginatedResult } from '../common/paginated-result.js';
 
 const RELATIONS = {
   requestor: true,
@@ -27,11 +32,73 @@ export class RequestsService {
     private readonly mailerService: MailerService,
   ) {}
 
-  async list(): Promise<Request[]> {
-    const requests = await this.requestsRepository.find({
-      relations: RELATIONS,
-    });
-    return this.attachAvailableStock(requests);
+  async paginate(
+    query: PaginatedRequestsQueryDto,
+  ): Promise<PaginatedResult<Request>> {
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      displayId,
+      requester,
+      itemName,
+      sort = RequestSortOrder.NEWEST,
+    } = query;
+    const direction = sort === RequestSortOrder.OLDEST ? 'ASC' : 'DESC';
+
+    // Filters/paginates on a query with no to-many join, so `skip`/`take`
+    // apply correctly. `itemName` needs the `items` -> `assets` join, which
+    // would fan out rows (breaking pagination) if done here — pushed into a
+    // subquery instead.
+    const qb = this.requestsRepository
+      .createQueryBuilder('request')
+      .leftJoin('request.requestor', 'requestor');
+
+    if (status) {
+      qb.andWhere('request.status = :status', { status });
+    }
+    if (displayId) {
+      qb.andWhere('request.displayId ILIKE :displayId', {
+        displayId: `%${displayId}%`,
+      });
+    }
+    if (requester) {
+      qb.andWhere(
+        '(requestor.firstName ILIKE :requester OR requestor.lastName ILIKE :requester OR requestor.email ILIKE :requester)',
+        { requester: `%${requester}%` },
+      );
+    }
+    if (itemName) {
+      qb.andWhere(
+        `request.id IN (SELECT ra."requestId" FROM request_assets ra INNER JOIN assets a ON a.id = ra."assetId" WHERE a.name ILIKE :itemName)`,
+        { itemName: `%${itemName}%` },
+      );
+    }
+
+    qb.orderBy('request.createdAt', direction)
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [pageOfRequests, total] = await qb.getManyAndCount();
+
+    // Re-fetch this page's requests with the full relation graph — can't
+    // eager-load `items`/`asset` on the query above without risking the
+    // pagination fan-out bug.
+    const data = pageOfRequests.length
+      ? await this.requestsRepository.find({
+          where: { id: In(pageOfRequests.map((r) => r.id)) },
+          relations: RELATIONS,
+          order: { createdAt: direction },
+        })
+      : [];
+
+    return {
+      data: await this.attachAvailableStock(data),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async find(id: number): Promise<Request> {
