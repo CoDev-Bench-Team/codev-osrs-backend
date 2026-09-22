@@ -6,6 +6,7 @@ import { RequestStatus } from '../entities/request.entity.js';
 export enum RequestSortOrder {
   NEWEST = 'newest',
   OLDEST = 'oldest',
+  EMPLOYEE_NAME_ASC = 'employee_name_asc',
 }
 
 export class PaginatedRequestsQueryDto {
@@ -44,7 +45,8 @@ export class PaginatedRequestsQueryDto {
   itemName?: string;
 
   @ApiPropertyOptional({
-    description: 'Sort order by submission date.',
+    description:
+      'Sort order: by submission date (newest/oldest first) or by employee name (A-Z).',
     enum: RequestSortOrder,
     default: RequestSortOrder.NEWEST,
   })

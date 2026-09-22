@@ -44,56 +44,88 @@ export class RequestsService {
       itemName,
       sort = RequestSortOrder.NEWEST,
     } = query;
-    const direction = sort === RequestSortOrder.OLDEST ? 'ASC' : 'DESC';
 
     // Filters/paginates on a query with no to-many join, so `skip`/`take`
     // apply correctly. `itemName` needs the `items` -> `assets` join, which
     // would fan out rows (breaking pagination) if done here — pushed into a
-    // subquery instead.
-    const qb = this.requestsRepository
-      .createQueryBuilder('request')
-      .leftJoin('request.requestor', 'requestor');
+    // subquery instead. `requestor` uses `leftJoinAndSelect` (not just
+    // `leftJoin`) even though only its columns are needed for filtering:
+    // TypeORM wraps any join + skip/take combination in an outer
+    // `SELECT DISTINCT` subquery, and that outer query can only reference
+    // columns the inner one actually selected — so ordering by a joined
+    // column (the employee-name sort) needs it selected, not just joined.
+    // Safe here since `requestor` is ManyToOne — no fan-out risk.
+    const buildFilteredQuery = () => {
+      const filtered = this.requestsRepository
+        .createQueryBuilder('request')
+        .leftJoinAndSelect('request.requestor', 'requestor');
 
-    if (status) {
-      qb.andWhere('request.status = :status', { status });
-    }
-    if (displayId) {
-      qb.andWhere('request.displayId ILIKE :displayId', {
-        displayId: `%${displayId}%`,
-      });
-    }
-    if (requester) {
-      qb.andWhere(
-        '(requestor.firstName ILIKE :requester OR requestor.lastName ILIKE :requester OR requestor.email ILIKE :requester)',
-        { requester: `%${requester}%` },
+      if (status) {
+        filtered.andWhere('request.status = :status', { status });
+      }
+      if (displayId) {
+        filtered.andWhere('request.displayId ILIKE :displayId', {
+          displayId: `%${displayId}%`,
+        });
+      }
+      if (requester) {
+        filtered.andWhere(
+          '(requestor.firstName ILIKE :requester OR requestor.lastName ILIKE :requester OR requestor.email ILIKE :requester)',
+          { requester: `%${requester}%` },
+        );
+      }
+      if (itemName) {
+        filtered.andWhere(
+          `request.id IN (SELECT ra."requestId" FROM request_assets ra INNER JOIN assets a ON a.id = ra."assetId" WHERE a.name ILIKE :itemName)`,
+          { itemName: `%${itemName}%` },
+        );
+      }
+
+      return filtered;
+    };
+
+    // `getManyAndCount()` is avoided here: TypeORM's automatic count-query
+    // derivation drops joins that are only referenced by `orderBy` (not
+    // `where`), which breaks with a "column does not exist" error once
+    // `orderBy` references the joined `requestor` table (the employee-name
+    // sort). Counting on a query with no `orderBy` at all sidesteps that.
+    const total = await buildFilteredQuery().getCount();
+
+    const idQuery = buildFilteredQuery();
+    if (sort === RequestSortOrder.EMPLOYEE_NAME_ASC) {
+      idQuery
+        .orderBy('requestor.firstName', 'ASC')
+        .addOrderBy('requestor.lastName', 'ASC');
+    } else {
+      idQuery.orderBy(
+        'request.createdAt',
+        sort === RequestSortOrder.OLDEST ? 'ASC' : 'DESC',
       );
     }
-    if (itemName) {
-      qb.andWhere(
-        `request.id IN (SELECT ra."requestId" FROM request_assets ra INNER JOIN assets a ON a.id = ra."assetId" WHERE a.name ILIKE :itemName)`,
-        { itemName: `%${itemName}%` },
-      );
-    }
+    idQuery.skip((page - 1) * limit).take(limit);
 
-    qb.orderBy('request.createdAt', direction)
-      .skip((page - 1) * limit)
-      .take(limit);
-
-    const [pageOfRequests, total] = await qb.getManyAndCount();
+    const pageOfRequests = await idQuery.getMany();
 
     // Re-fetch this page's requests with the full relation graph — can't
     // eager-load `items`/`asset` on the query above without risking the
-    // pagination fan-out bug.
-    const data = pageOfRequests.length
+    // pagination fan-out bug. `find()` with `id: In(...)` doesn't preserve
+    // order, so the already-correctly-sorted ids from the query above are
+    // used to reorder the result instead of re-sorting (which would only
+    // be right for the createdAt sorts, not employee name).
+    const orderedIds = pageOfRequests.map((r) => r.id);
+    const data = orderedIds.length
       ? await this.requestsRepository.find({
-          where: { id: In(pageOfRequests.map((r) => r.id)) },
+          where: { id: In(orderedIds) },
           relations: RELATIONS,
-          order: { createdAt: direction },
         })
       : [];
+    const dataById = new Map(data.map((r) => [r.id, r]));
+    const orderedData = orderedIds
+      .map((id) => dataById.get(id))
+      .filter((r): r is Request => r !== undefined);
 
     return {
-      data: await this.attachAvailableStock(data),
+      data: await this.attachAvailableStock(orderedData),
       total,
       page,
       limit,
