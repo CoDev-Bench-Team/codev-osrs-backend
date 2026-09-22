@@ -6,6 +6,7 @@ import { dbConfig } from './config/typeorm.config.js';
 import { UsersModule } from './users/users.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { AssetsModule } from './assets/assets.module.js';
+import { RequestsModule } from './requests/requests.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -26,6 +27,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     UsersModule,
     AuthModule,
     AssetsModule,
+    RequestsModule,
   ],
 })
 export class AppModule {}

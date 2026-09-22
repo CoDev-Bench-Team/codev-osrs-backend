@@ -68,4 +68,8 @@ export class Asset extends AuditableEntity {
 
     @Column({ type: 'varchar', length: 255, nullable: true })
     recoveryPin: string | null;
+
+    // Inactive items cannot be added to new requests (spec FR-005).
+    @Column({ type: 'boolean', default: true })
+    isActive: boolean;
 }

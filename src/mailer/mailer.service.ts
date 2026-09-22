@@ -9,6 +9,16 @@ const welcomeTemplate = readFile(
     'utf8',
 ).then((template) => Handlebars.compile(template, { strict: true }));
 
+const requestSubmittedTemplate = readFile(
+    new URL('./templates/request-submitted.hbs', import.meta.url),
+    'utf8',
+).then((template) => Handlebars.compile(template, { strict: true }));
+
+interface RequestSubmittedLine {
+    itemName: string;
+    quantity: number;
+}
+
 @Injectable()
 export class MailerService {
     constructor(
@@ -29,5 +39,29 @@ export class MailerService {
                 portalUrl: process.env.PORTAL_URL,
             }),
         });
+    }
+
+    /** Sends the "Request Submitted" email (process-flow.md §1) to the
+     * requestor. Best-effort: a delivery failure is swallowed rather than
+     * thrown, so it never rolls back an already-valid submit. */
+    async sendRequestSubmittedEmail(
+        requestId: number,
+        requestorName: string,
+        recipient: string,
+        items: RequestSubmittedLine[],
+    ): Promise<void> {
+        const renderTemplate = await requestSubmittedTemplate;
+
+        try {
+            await this.mailerService.sendMail({
+                from: process.env.SMTP_DEFAULT_FROM,
+                to: recipient,
+                subject: 'Office Supplies Request Submitted',
+                html: renderTemplate({ name: requestorName, requestId, items }),
+            });
+        } catch {
+            // Delivery failure is not persisted for MVP (see PR #79 review) —
+            // an outbox-based retry is planned as a later improvement.
+        }
     }
 }
