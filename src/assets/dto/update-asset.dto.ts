@@ -1,5 +1,4 @@
 import {
-  IsArray,
   IsEnum,
   IsInt,
   IsNotEmpty,
@@ -7,25 +6,9 @@ import {
   IsString,
   MaxLength,
   Min,
-  ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { AssetCategory, AssetLocation, AssetSpec } from '../entities/asset.entity.js';
-
-class AssetSpecDto implements AssetSpec {
-  @ApiPropertyOptional({ description: 'The label of the custom spec field.', example: 'Color' })
-  @IsNotEmpty()
-  @IsString()
-  @MaxLength(255)
-  key: string;
-
-  @ApiPropertyOptional({ description: 'The value of the custom spec field.', example: 'Black' })
-  @IsNotEmpty()
-  @IsString()
-  @MaxLength(1000)
-  value: string;
-}
+import { AssetCategory } from '../entities/asset.entity.js';
 
 export class UpdateAssetDto {
   @ApiPropertyOptional({
@@ -54,17 +37,58 @@ export class UpdateAssetDto {
   @IsEnum(AssetCategory)
   type?: AssetCategory;
 
-  @ApiPropertyOptional({ description: 'The office location the item belongs to.', enum: AssetLocation, example: AssetLocation.CEBU })
+  @ApiPropertyOptional({ description: 'A free-form description of the item.', example: 'Business laptop with a 14-inch display.' })
   @IsOptional()
-  @IsEnum(AssetLocation)
-  location?: AssetLocation;
+  @IsString()
+  description?: string;
 
-  @ApiPropertyOptional({ description: 'Custom spec fields for the item.', type: [AssetSpecDto] })
+  @ApiPropertyOptional({ description: 'The RAM spec of the item.', example: '16GB' })
   @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => AssetSpecDto)
-  specs?: AssetSpecDto[];
+  @IsString()
+  @MaxLength(255)
+  ram?: string;
+
+  @ApiPropertyOptional({ description: 'The processor spec of the item.', example: 'Intel Core i7-1355U' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  processor?: string;
+
+  @ApiPropertyOptional({ description: 'The graphics spec of the item.', example: 'Intel Iris Xe Graphics' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  graphics?: string;
+
+  @ApiPropertyOptional({ description: 'The operating system spec of the item.', example: 'Windows 11 Pro' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  operatingSystem?: string;
+
+  @ApiPropertyOptional({ description: 'The storage spec of the item.', example: '512GB SSD' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  storage?: string;
+
+  @ApiPropertyOptional({ description: 'The serial number of the item.', example: 'PF3ABCXY' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  serialNumber?: string;
+
+  @ApiPropertyOptional({ description: "The item's BitLocker identifier.", example: '12345678-90AB-CDEF-1234-567890ABCDEF' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  bitLockerIdentifier?: string;
+
+  @ApiPropertyOptional({ description: "The item's BitLocker recovery PIN.", example: '123456-654321-123456-654321-123456-654321-123456-654321' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  recoveryPin?: string;
 
   @ApiPropertyOptional({ description: 'The stock quantity for the item.', example: 0 })
   @IsOptional()

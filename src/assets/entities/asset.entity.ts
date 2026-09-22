@@ -17,13 +17,8 @@ export enum AssetLocation {
     CEBU = 'Cebu',
     BACOLOD = 'Bacolod',
     MAKATI = 'Makati',
-    PASIG = 'Pasig',
+    ORTIGAS = 'Ortigas',
     DAVAO = 'Davao',
-}
-
-export interface AssetSpec {
-    key: string;
-    value: string;
 }
 
 @Entity({ name: 'assets' })
@@ -41,16 +36,36 @@ export class Asset extends AuditableEntity {
     @Column({ type: 'varchar', length: 255, nullable: true })
     model: string | null;
 
-    @Index()
-    @Column({ type: 'enum', enum: AssetLocation })
-    location: AssetLocation;
-
     @Column()
     lowQtyAlert: number;
 
     @Column({ type: 'text', nullable: true })
     imageBase64: string | null;
 
-    @Column({ type: 'jsonb', default: [], nullable: true })
-    specs?: AssetSpec[];
+    @Column({ type: 'text', nullable: true })
+    description: string | null;
+
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    ram: string | null;
+
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    processor: string | null;
+
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    graphics: string | null;
+
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    operatingSystem: string | null;
+
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    storage: string | null;
+
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    serialNumber: string | null;
+
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    bitLockerIdentifier: string | null;
+
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    recoveryPin: string | null;
 }
