@@ -10,26 +10,41 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request as ExpressRequest } from 'express';
 import { RequestsService } from './requests.service.js';
 import { CreateRequestDto } from './dto/create-request.dto.js';
 import { UpdateRequestDto } from './dto/update-request.dto.js';
 import { PaginatedRequestsQueryDto } from './dto/paginated-requests-query.dto.js';
+import { ApiValidationProblemResponse } from '../common/api-validation-problem-response.decorator.js';
 
+@ApiTags('Requests')
 @Controller('requests')
 export class RequestsController {
   constructor(private readonly requestsService: RequestsService) {}
 
+  @ApiOperation({
+    summary: 'Retrieves a paginated list of requests.',
+    description:
+      'Supports filtering by status, display ID, requester name/email, and requested item name, plus sorting by submission date.',
+  })
   @Get()
   paginate(@Query() paginatedRequestsQueryDto: PaginatedRequestsQueryDto) {
     return this.requestsService.paginate(paginatedRequestsQueryDto);
   }
 
+  @ApiOperation({
+    summary: 'Fetches a single request by its numeric identifier.',
+  })
   @Get(':id')
   find(@Param('id', ParseIntPipe) id: number) {
     return this.requestsService.find(id);
   }
 
+  @ApiOperation({
+    summary: 'Creates a new request using the supplied item details.',
+  })
+  @ApiValidationProblemResponse(CreateRequestDto)
   @Post()
   create(
     @Body() createRequestDto: CreateRequestDto,
@@ -40,6 +55,10 @@ export class RequestsController {
     return this.requestsService.create(createRequestDto, request.user!);
   }
 
+  @ApiOperation({
+    summary: 'Updates an existing request with the supplied details.',
+  })
+  @ApiValidationProblemResponse(UpdateRequestDto)
   @Patch(':id')
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -48,6 +67,7 @@ export class RequestsController {
     return this.requestsService.update(id, updateRequestDto);
   }
 
+  @ApiOperation({ summary: 'Removes a request from the system by ID.' })
   @Delete(':id')
   delete(@Param('id', ParseIntPipe) id: number) {
     return this.requestsService.delete(id);
