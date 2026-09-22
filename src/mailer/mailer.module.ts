@@ -1,11 +1,8 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import nodemailer, { type Transporter } from 'nodemailer';
 import { MailerService } from './mailer.service.js';
-import { NotificationLog } from '../notifications/entities/notification-log.entity.js';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([NotificationLog])],
     providers: [
         {
             provide: 'MAIL_TRANSPORTER',

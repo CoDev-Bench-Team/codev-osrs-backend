@@ -1,25 +1,16 @@
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, Index } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToMany, Index } from 'typeorm';
 import type { Relation } from 'typeorm';
 import { User } from '../../users/entities/user.entity.js';
 import { AuditableEntity } from '../../common/auditable.base.js';
+import { RequestAsset } from './request-asset.entity.js';
 
 export enum RequestStatus {
   PENDING_APPROVAL = 'pending_approval',
   APPROVED = 'approved',
+  READY_FOR_PICKUP = 'ready_for_pickup',
+  FOR_DELIVERY = 'for_delivery',
   REJECTED = 'rejected',
-  FOR_RELEASE = 'for_release',
-  RELEASED = 'released',
   COMPLETED = 'completed',
-}
-
-/** One line item within `Request.items`. `assetId` references `Asset.id`,
- * but isn't a DB-level foreign key since `items` is a JSON column.
- * `itemName` is a snapshot of the asset's name at submit time, so a later
- * rename doesn't rewrite request history. */
-export interface RequestAsset {
-  assetId: number;
-  itemName: string;
-  quantity: number;
 }
 
 /** One entry in `Request.timeline`, recording each status transition. */
@@ -41,8 +32,8 @@ export class Request extends AuditableEntity {
   @ManyToOne(() => User)
   requestor: Relation<User>;
 
-  @Column({ type: 'jsonb', default: [] })
-  items: RequestAsset[];
+  @OneToMany(() => RequestAsset, (item) => item.request, { cascade: true })
+  items: Relation<RequestAsset>[];
 
   @Index()
   @Column({

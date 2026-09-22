@@ -1,12 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {
-  Request,
-  RequestAsset,
-  RequestStatus,
-  TimelineEvent,
-} from './entities/request.entity.js';
+import { Request, RequestStatus, TimelineEvent } from './entities/request.entity.js';
+import { RequestAsset } from './entities/request-asset.entity.js';
 import { User } from '../users/entities/user.entity.js';
 import { Asset } from '../assets/entities/asset.entity.js';
 import {
@@ -17,7 +13,11 @@ import { MailerService } from '../mailer/mailer.service.js';
 import { CreateRequestDto } from './dto/create-request.dto.js';
 import { UpdateRequestDto } from './dto/update-request.dto.js';
 
-const RELATIONS = { requestor: true, approvedBy: true };
+const RELATIONS = {
+  requestor: true,
+  approvedBy: true,
+  items: { asset: true },
+};
 
 @Injectable()
 export class RequestsService {
@@ -56,12 +56,12 @@ export class RequestsService {
       );
     }
 
-    // Validates every line, reserves stock, and creates the request in one
-    // atomic transaction: either all lines succeed and stock is decremented
-    // for each, or nothing is created and nothing is reserved (FR-005/006).
-    // Reservation locks the AssetInventory rows being claimed (`FOR UPDATE`,
-    // in a stable id order) so concurrent submits for the last unit can't
-    // both succeed (ADR-0002).
+    // Validates every line, reserves stock, and creates the request (plus
+    // its RequestAsset lines, via cascade) in one atomic transaction: either
+    // all lines succeed and stock is decremented for each, or nothing is
+    // created and nothing is reserved (FR-005/006). Reservation locks the
+    // AssetInventory rows being claimed (`FOR UPDATE`, in a stable id order)
+    // so concurrent submits for the last unit can't both succeed (ADR-0002).
     const savedRequest = await this.requestsRepository.manager.transaction(
       async (manager) => {
         const requestItems: RequestAsset[] = [];
@@ -102,11 +102,9 @@ export class RequestsService {
             { status: AssetInventoryStatus.RESERVED },
           );
 
-          requestItems.push({
-            assetId: asset.id,
-            itemName: asset.name,
-            quantity: line.quantity,
-          });
+          requestItems.push(
+            manager.create(RequestAsset, { asset, quantity: line.quantity }),
+          );
         }
 
         const initialEvent: TimelineEvent = {
@@ -124,6 +122,7 @@ export class RequestsService {
           displayId: 'PENDING', // replaced with a real ID once the row has one
         });
 
+        // `items` cascades on save, inserting the RequestAsset rows too.
         const inserted = await manager.save(newRequest);
         inserted.displayId = `REQ-${inserted.createdAt.getFullYear()}-${inserted.id}`;
 
@@ -131,13 +130,16 @@ export class RequestsService {
       },
     );
 
-    // Sent (and logged) after the transaction commits — a delivery failure
-    // must not roll back an already-valid status change.
+    // Sent after the transaction commits — a delivery failure must not roll
+    // back an already-valid submit.
     await this.mailerService.sendRequestSubmittedEmail(
       savedRequest.id,
       requestor.firstName,
       requestor.email,
-      savedRequest.items,
+      savedRequest.items.map((item) => ({
+        itemName: item.asset.name,
+        quantity: item.quantity,
+      })),
     );
 
     return savedRequest;

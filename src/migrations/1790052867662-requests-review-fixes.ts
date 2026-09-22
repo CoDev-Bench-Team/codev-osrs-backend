@@ -1,20 +1,26 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class RequestsRework1790030859255 implements MigrationInterface {
-  name = 'RequestsRework1790030859255';
+export class RequestsReviewFixes1790052867662 implements MigrationInterface {
+  name = 'RequestsReviewFixes1790052867662';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `CREATE TABLE "notification_logs" ("id" SERIAL NOT NULL, "requestId" integer NOT NULL, "type" character varying(20) NOT NULL, "recipients" text array NOT NULL, "subject" character varying(255) NOT NULL, "body" text NOT NULL, "status" character varying(10) NOT NULL, "error" text, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "PK_19c524e644cdeaebfcffc284871" PRIMARY KEY ("id"))`,
+      `CREATE TABLE "request_assets" ("id" SERIAL NOT NULL, "quantity" integer NOT NULL, "requestId" integer, "assetId" integer, CONSTRAINT "PK_91798a7bff1188693bbf6c83abe" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
-      `CREATE TABLE "requests" ("createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP DEFAULT now(), "deletedAt" TIMESTAMP, "id" SERIAL NOT NULL, "displayId" character varying(20) NOT NULL, "items" jsonb NOT NULL DEFAULT '[]', "status" character varying(20) NOT NULL DEFAULT 'pending_approval', "purpose" character varying(500), "timeline" jsonb NOT NULL DEFAULT '[]', "createdById" integer, "updatedById" integer, "deletedById" integer, "requestorId" integer, "approvedById" integer, CONSTRAINT "UQ_b8db731743f529e907365b2ef90" UNIQUE ("displayId"), CONSTRAINT "PK_0428f484e96f9e6a55955f29b5f" PRIMARY KEY ("id"))`,
+      `CREATE TABLE "requests" ("createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP DEFAULT now(), "deletedAt" TIMESTAMP, "id" SERIAL NOT NULL, "displayId" character varying(20) NOT NULL, "status" character varying(20) NOT NULL DEFAULT 'pending_approval', "purpose" character varying(500), "timeline" jsonb NOT NULL DEFAULT '[]', "createdById" integer, "updatedById" integer, "deletedById" integer, "requestorId" integer, "approvedById" integer, CONSTRAINT "UQ_b8db731743f529e907365b2ef90" UNIQUE ("displayId"), CONSTRAINT "PK_0428f484e96f9e6a55955f29b5f" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
       `CREATE INDEX "IDX_59b85be6a3c16cbf27f8bdda1d" ON "requests"  ("status") `,
     );
     await queryRunner.query(
       `ALTER TABLE "assets" ADD "isActive" boolean NOT NULL DEFAULT true`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "request_assets" ADD CONSTRAINT "FK_268256ec21e96e7360381b7f8c9" FOREIGN KEY ("requestId") REFERENCES "requests"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "request_assets" ADD CONSTRAINT "FK_781f6f7b1a31fee97a2c48dcd57" FOREIGN KEY ("assetId") REFERENCES "assets"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
     );
     await queryRunner.query(
       `ALTER TABLE "requests" ADD CONSTRAINT "FK_05061437f8bbfcfef7bef98d1ad" FOREIGN KEY ("createdById") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
@@ -49,11 +55,17 @@ export class RequestsRework1790030859255 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "requests" DROP CONSTRAINT "FK_05061437f8bbfcfef7bef98d1ad"`,
     );
+    await queryRunner.query(
+      `ALTER TABLE "request_assets" DROP CONSTRAINT "FK_781f6f7b1a31fee97a2c48dcd57"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "request_assets" DROP CONSTRAINT "FK_268256ec21e96e7360381b7f8c9"`,
+    );
     await queryRunner.query(`ALTER TABLE "assets" DROP COLUMN "isActive"`);
     await queryRunner.query(
       `DROP INDEX "public"."IDX_59b85be6a3c16cbf27f8bdda1d"`,
     );
     await queryRunner.query(`DROP TABLE "requests"`);
-    await queryRunner.query(`DROP TABLE "notification_logs"`);
+    await queryRunner.query(`DROP TABLE "request_assets"`);
   }
 }
