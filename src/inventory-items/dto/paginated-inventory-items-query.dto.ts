@@ -1,10 +1,10 @@
 import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { AssetCategory } from '../entities/asset.entity.js';
-import { AssetInventoryStatus } from '../entities/asset-inventory.entity.js';
-import { PaginationQueryDto } from './pagination-query.dto.js';
+import { AssetCategory } from '../../assets/entities/asset.entity.js';
+import { InventoryItemStatus } from '../entities/inventory-item.entity.js';
+import { PaginationQueryDto } from '../../assets/dto/pagination-query.dto.js';
 
-export class PaginatedAssetInventoryQueryDto extends PaginationQueryDto {
+export class PaginatedInventoryItemsQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({ description: "Filter by the asset's item name, model, or category name (partial match).", example: 'Latitude' })
   @IsOptional()
   @IsString()
@@ -16,11 +16,8 @@ export class PaginatedAssetInventoryQueryDto extends PaginationQueryDto {
   @IsEnum(AssetCategory)
   category?: AssetCategory;
 
-  @ApiPropertyOptional({
-    description: 'Filter by stock unit status. Assigned units are the ones shown as Deployed.',
-    enum: AssetInventoryStatus,
-  })
+  @ApiPropertyOptional({ description: 'Filter by inventory item status.', enum: InventoryItemStatus })
   @IsOptional()
-  @IsEnum(AssetInventoryStatus)
-  status?: AssetInventoryStatus;
+  @IsEnum(InventoryItemStatus)
+  status?: InventoryItemStatus;
 }
