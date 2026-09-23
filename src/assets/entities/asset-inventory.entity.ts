@@ -8,10 +8,12 @@ export enum AssetInventoryStatus {
     AVAILABLE = 'Available',
     RESERVED = 'Reserved',
     ASSIGNED = 'Assigned',
+    INACTIVE = 'Inactive',
 }
 
 @Entity({ name: 'asset_inventories' })
 @Index(['asset', 'status'])
+@Index('UQ_asset_inventories_serialNumber', ['serialNumber'], { unique: true, where: '"deletedAt" IS NULL' })
 export class AssetInventory extends AuditableEntity {
     @PrimaryGeneratedColumn()
     id: number;
@@ -23,8 +25,20 @@ export class AssetInventory extends AuditableEntity {
     @ManyToOne(() => Asset)
     asset: Relation<Asset>;
 
-    @Column()
-    assetCode: string;
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    serialNumber: string | null;
+
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    bitLockerIdentifier: string | null;
+
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    recoveryPin: string | null;
+
+    @Column({ type: 'text', nullable: true })
+    description: string | null;
+
+    @Column({ type: 'varchar', length: 2048, nullable: true })
+    attachmentUrl: string | null;
 
     @Column({ type: 'timestamp', nullable: true })
     assignedAt: Date | null;

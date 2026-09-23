@@ -1,18 +1,15 @@
 import {
-  IsDate,
   IsDefined,
   IsEnum,
   IsInt,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
   MaxLength,
   Min,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { AssetCategory, AssetLocation } from '../entities/asset.entity.js';
+import { AssetCategory } from '../entities/asset.entity.js';
 
 export class CreateAssetDto {
   @ApiPropertyOptional({
@@ -30,27 +27,23 @@ export class CreateAssetDto {
   @MaxLength(255)
   name: string;
 
-  @ApiPropertyOptional({ description: 'The brand or model of the item.', example: 'Logitech MX Keys' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  model?: string;
-
   @ApiProperty({ description: 'The category the item belongs to.', enum: AssetCategory, example: AssetCategory.LAPTOP })
   @IsDefined()
   @IsNotEmpty()
   @IsEnum(AssetCategory)
-  type: AssetCategory;
+  category: AssetCategory;
 
-  @ApiProperty({ description: 'The office location assigned to each unit created for this item.', enum: AssetLocation, example: AssetLocation.CEBU })
+  @ApiProperty({ description: 'The brand or model of the item.', example: 'Logitech MX Keys' })
   @IsDefined()
   @IsNotEmpty()
-  @IsEnum(AssetLocation)
-  location: AssetLocation;
+  @IsString()
+  @MaxLength(255)
+  model: string;
 
   @ApiPropertyOptional({ description: 'A free-form description of the item.', example: 'Business laptop with a 14-inch display.' })
   @IsOptional()
   @IsString()
+  @MaxLength(2048)
   description?: string;
 
   @ApiPropertyOptional({ description: 'The RAM spec of the item.', example: '16GB' })
@@ -82,48 +75,6 @@ export class CreateAssetDto {
   @IsString()
   @MaxLength(255)
   storage?: string;
-
-  @ApiPropertyOptional({ description: 'The serial number of the item.', example: 'PF3ABCXY' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  serialNumber?: string;
-
-  @ApiPropertyOptional({ description: "The item's BitLocker identifier.", example: '12345678-90AB-CDEF-1234-567890ABCDEF' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  bitLockerIdentifier?: string;
-
-  @ApiPropertyOptional({ description: "The item's BitLocker recovery PIN.", example: '123456-654321-123456-654321-123456-654321-123456-654321' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  recoveryPin?: string;
-
-  @ApiPropertyOptional({ description: 'The purchase price for each unit created for this item.', example: 1299.99 })
-  @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  price?: number;
-
-  @ApiPropertyOptional({ description: 'The supplier each unit created for this item was purchased from.', example: 'Amazon' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  supplier?: string;
-
-  @ApiPropertyOptional({ description: 'The date each unit created for this item was purchased.', example: '2026-01-15T00:00:00.000Z' })
-  @IsOptional()
-  @IsDate()
-  @Type(() => Date)
-  purchasedAt?: Date;
-
-  @ApiPropertyOptional({ description: 'The initial stock quantity for the item.', example: 0, default: 0 })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  quantity?: number = 0;
 
   @ApiPropertyOptional({ description: 'The stock quantity at which the item is considered low in stock.', example: 5, default: 5 })
   @IsOptional()

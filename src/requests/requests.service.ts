@@ -176,12 +176,6 @@ export class RequestsService {
               `Asset with ID '${line.assetId}' could not be found.`,
             );
           }
-          if (!asset.isActive) {
-            throw new BadRequestException(
-              `Asset '${asset.name}' is not active and cannot be requested.`,
-            );
-          }
-
           const availableUnits = await manager
             .createQueryBuilder(AssetInventory, 'inventory')
             .setLock('pessimistic_write')

@@ -26,15 +26,15 @@ export class Asset extends AuditableEntity {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @Index()
+    @Index('IDX_assets_category')
     @Column({ type: 'enum', enum: AssetCategory })
-    type: AssetCategory;
+    category: AssetCategory;
 
     @Column({ type: 'varchar', length: 255 })
     name: string;
 
-    @Column({ type: 'varchar', length: 255, nullable: true })
-    model: string | null;
+    @Column({ type: 'varchar', length: 255 })
+    model: string;
 
     @Column()
     lowQtyAlert: number;
@@ -59,17 +59,4 @@ export class Asset extends AuditableEntity {
 
     @Column({ type: 'varchar', length: 255, nullable: true })
     storage: string | null;
-
-    @Column({ type: 'varchar', length: 255, nullable: true })
-    serialNumber: string | null;
-
-    @Column({ type: 'varchar', length: 255, nullable: true })
-    bitLockerIdentifier: string | null;
-
-    @Column({ type: 'varchar', length: 255, nullable: true })
-    recoveryPin: string | null;
-
-    // Inactive items cannot be added to new requests (spec FR-005).
-    @Column({ type: 'boolean', default: true })
-    isActive: boolean;
 }

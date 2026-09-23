@@ -13,9 +13,11 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AssetsService } from './assets.service.js';
 import { CreateAssetDto } from './dto/create-asset.dto.js';
 import { UpdateAssetDto } from './dto/update-asset.dto.js';
-import { UpdateStocksDto } from './dto/update-stocks.dto.js';
+import { CreateAssetInventoryDto } from './dto/create-asset-inventory.dto.js';
+import { CreateAssetInventoryBatchDto } from './dto/create-asset-inventory-batch.dto.js';
 import { UpdateAssetInventoryDto } from './dto/update-asset-inventory.dto.js';
 import { PaginatedAssetsQueryDto } from './dto/paginated-assets-query.dto.js';
+import { PaginatedAssetInventoryQueryDto } from './dto/paginated-asset-inventory-query.dto.js';
 import { Public } from '../auth/public.decorator.js';
 import { ApiValidationProblemResponse } from '../common/api-validation-problem-response.decorator.js';
 
@@ -24,19 +26,33 @@ import { ApiValidationProblemResponse } from '../common/api-validation-problem-r
 export class AssetsController {
   constructor(private readonly assetsService: AssetsService) {}
 
-  @ApiOperation({ summary: 'Retrieves a paginated list of assets.' })
+  @ApiOperation({ summary: 'Retrieves a paginated list of assets, optionally filtered by search text, category, office location, and stock level.' })
   @Get()
-  paginate(@Query() paginatedAssetsQueryDto: PaginatedAssetsQueryDto) {
-    return this.assetsService.paginate(paginatedAssetsQueryDto);
+  list(@Query() paginatedAssetsQueryDto: PaginatedAssetsQueryDto) {
+    return this.assetsService.list(paginatedAssetsQueryDto);
   }
 
-  @ApiOperation({ summary: 'Retrieves a paginated list of individual asset stock units.' })
+  @ApiOperation({ summary: 'Retrieves a paginated list of individual asset stock units, optionally filtered by search text, category, and status.' })
   @Get('stocks')
-  paginateInventory(@Query() paginatedAssetsQueryDto: PaginatedAssetsQueryDto) {
-    return this.assetsService.paginateInventory(paginatedAssetsQueryDto);
+  listStock(@Query() paginatedAssetInventoryQueryDto: PaginatedAssetInventoryQueryDto) {
+    return this.assetsService.listStock(paginatedAssetInventoryQueryDto);
   }
 
-  @ApiOperation({ summary: 'Fetches a single stock unit by its numeric identifier.' })
+  @ApiOperation({ summary: 'Creates a single inventory Item for an existing asset.' })
+  @ApiValidationProblemResponse(CreateAssetInventoryDto)
+  @Post('stocks')
+  createStock(@Body() createAssetInventoryDto: CreateAssetInventoryDto) {
+    return this.assetsService.createStock(createAssetInventoryDto);
+  }
+
+  @ApiOperation({ summary: 'Creates multiple inventory item for an existing asset, one per entry in units.' })
+  @ApiValidationProblemResponse(CreateAssetInventoryBatchDto)
+  @Post('stocks/bulk')
+  createStocks(@Body() createAssetInventoryBatchDto: CreateAssetInventoryBatchDto) {
+    return this.assetsService.createStocks(createAssetInventoryBatchDto);
+  }
+
+  @ApiOperation({ summary: 'Fetches a single inventory item unit by its numeric identifier.' })
   @Get('stocks/:id')
   findStock(@Param('id', ParseIntPipe) id: number) {
     return this.assetsService.findStock(id);
@@ -70,18 +86,6 @@ export class AssetsController {
     @Body() updateAssetDto: UpdateAssetDto,
   ) {
     return this.assetsService.update(id, updateAssetDto);
-  }
-
-  @ApiOperation({
-    summary: 'Adds stock to an existing asset for one or more office locations.',
-  })
-  @ApiValidationProblemResponse(UpdateStocksDto)
-  @Patch(':id/stocks')
-  updateStocks(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() updateStocksDto: UpdateStocksDto,
-  ) {
-    return this.assetsService.updateStocks(id, updateStocksDto);
   }
 
   @ApiOperation({ summary: 'Updates the details of a single stock unit.' })
