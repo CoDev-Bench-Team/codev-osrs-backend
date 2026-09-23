@@ -27,14 +27,14 @@ export class Asset extends AuditableEntity {
     id: number;
 
     @Index('IDX_assets_category')
-    @Column({ type: 'enum', enum: AssetCategory })
+    @Column({ type: 'enum', enum: AssetCategory, default: AssetCategory.OTHER })
     category: AssetCategory;
 
     @Column({ type: 'varchar', length: 255 })
     name: string;
 
-    @Column({ type: 'varchar', length: 255 })
-    model: string;
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    model: string | null;
 
     @Column()
     lowQtyAlert: number;

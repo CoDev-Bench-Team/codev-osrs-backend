@@ -47,7 +47,7 @@ export class AssetInventory extends AuditableEntity {
     status: AssetInventoryStatus;
 
     @Index()
-    @Column({ type: 'enum', enum: AssetLocation })
+    @Column({ type: 'enum', enum: AssetLocation, default: AssetLocation.CEBU })
     location: AssetLocation;
 
     @Column({
