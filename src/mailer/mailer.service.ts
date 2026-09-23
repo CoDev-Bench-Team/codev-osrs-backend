@@ -202,6 +202,25 @@ export class MailerService {
         });
     }
 
+    /** "Your request is complete" (BEN-110). The ticket defines no design for
+     * this one — copy and the purple pill follow the other status emails and
+     * the design file's recolour of Completed (frontend spec, 2026-09-15). */
+    async sendRequestCompletedEmail(
+        context: RequestEmailContext,
+    ): Promise<void> {
+        await this.sendStatusChange(context, {
+            subject: `Your request ${context.displayId} is complete`,
+            pillLabel: 'Completed',
+            pillBackground: '#f1ebfb',
+            pillColor: '#6b3fc4',
+            title: 'Your request is complete',
+            body: `Thanks, ${context.requesterFirstName} — you've confirmed your items were received, so this request is now closed. Need anything else? Just submit a new request.`,
+            dateLine: `Completed ${formatSubmittedAt(context.submittedAt)}`,
+            showItems: true,
+            ctaLabel: 'View request',
+        });
+    }
+
     private async sendStatusChange(
         context: RequestEmailContext,
         variant: {

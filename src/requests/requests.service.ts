@@ -451,8 +451,9 @@ export class RequestsService {
         return this.mailerService.sendRequestReadyForPickupEmail(context);
       case RequestStatus.FOR_DELIVERY:
         return this.mailerService.sendRequestForDeliveryEmail(context);
+      case RequestStatus.COMPLETED:
+        return this.mailerService.sendRequestCompletedEmail(context);
       default:
-        // `completed` has no email defined on the ticket.
         return;
     }
   }
