@@ -45,6 +45,11 @@ export class Request extends AuditableEntity {
   @Column({ type: 'varchar', length: 500, nullable: true })
   purpose: string | null;
 
+  /** Required when the request is rejected; shown back to the requester. */
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  rejectionReason: string | null;
+
+  /** The admin who approved or rejected the request. */
   @ManyToOne(() => User, { nullable: true })
   approvedBy: Relation<User | null>;
 

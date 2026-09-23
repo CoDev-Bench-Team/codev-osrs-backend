@@ -56,15 +56,20 @@ export class RequestsController {
   }
 
   @ApiOperation({
-    summary: 'Updates an existing request with the supplied details.',
+    summary: 'Updates an existing request, including the review flow.',
+    description:
+      'Drives approve, reject (with a reason), release (ready_for_pickup or for_delivery) and complete. Illegal status transitions are refused with a 409.',
   })
   @ApiValidationProblemResponse(UpdateRequestDto)
   @Patch(':id')
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateRequestDto: UpdateRequestDto,
+    @Req() request: ExpressRequest,
   ) {
-    return this.requestsService.update(id, updateRequestDto);
+    // The global AuthGuard rejects unauthenticated requests before this
+    // handler runs, so `request.user` is always populated here.
+    return this.requestsService.update(id, updateRequestDto, request.user!);
   }
 
   @ApiOperation({ summary: 'Removes a request from the system by ID.' })
