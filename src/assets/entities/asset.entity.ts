@@ -43,8 +43,8 @@ export class Asset {
     @Column({ type: 'varchar', length: 255 })
     name: string;
 
-    @Column({ type: 'varchar', length: 255, nullable: true })
-    model: string | null;
+    @Column({ type: 'varchar', length: 255 })
+    model: string;
 
     @Column()
     lowQtyAlert: number;

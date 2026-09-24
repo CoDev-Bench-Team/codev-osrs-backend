@@ -1,14 +1,14 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class Migrations1790208140588 implements MigrationInterface {
-    name = 'Migrations1790208140588'
+export class Migrations1790208372080 implements MigrationInterface {
+    name = 'Migrations1790208372080'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`CREATE TABLE "users" ("id" SERIAL NOT NULL, "google_subject" character varying(255) NOT NULL, "email" character varying(320) NOT NULL, "first_name" character varying(50) NOT NULL, "last_name" character varying(50) NOT NULL, "avatar_url" character varying(2048) NOT NULL, "role" character varying(10) NOT NULL DEFAULT 'employee', "location" character varying(10) NOT NULL DEFAULT 'Cebu', "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP DEFAULT now(), "deleted_at" TIMESTAMP, "created_by_id" integer, "updated_by_id" integer, "deleted_by_id" integer, CONSTRAINT "UQ_402623b2ebefef1905c4d0e0d1f" UNIQUE ("google_subject"), CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_ace513fa30d485cfd25c11a9e4" ON "users"  ("role") `);
         await queryRunner.query(`CREATE INDEX "IDX_15b3fe608b52f34df363512e39" ON "users"  ("location") `);
         await queryRunner.query(`CREATE TYPE "public"."assets_category_enum" AS ENUM('Laptop', 'Headset', 'Monitor', 'Phone', 'UPS', 'Mice', 'Wifi', 'Type C Hub', 'Other Devices')`);
-        await queryRunner.query(`CREATE TABLE "assets" ("id" SERIAL NOT NULL, "category" "public"."assets_category_enum" NOT NULL DEFAULT 'Other Devices', "name" character varying(255) NOT NULL, "model" character varying(255), "low_qty_alert" integer NOT NULL, "image_base64" text, "description" text, "ram" character varying(255), "processor" character varying(255), "graphics" character varying(255), "operating_system" character varying(255), "storage" character varying(255), "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP DEFAULT now(), "deleted_at" TIMESTAMP, "created_by_id" integer, "updated_by_id" integer, "deleted_by_id" integer, CONSTRAINT "PK_da96729a8b113377cfb6a62439c" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE TABLE "assets" ("id" SERIAL NOT NULL, "category" "public"."assets_category_enum" NOT NULL DEFAULT 'Other Devices', "name" character varying(255) NOT NULL, "model" character varying(255) NOT NULL, "low_qty_alert" integer NOT NULL, "image_base64" text, "description" text, "ram" character varying(255), "processor" character varying(255), "graphics" character varying(255), "operating_system" character varying(255), "storage" character varying(255), "created_at" TIMESTAMP NOT NULL DEFAULT now(), "updated_at" TIMESTAMP DEFAULT now(), "deleted_at" TIMESTAMP, "created_by_id" integer, "updated_by_id" integer, "deleted_by_id" integer, CONSTRAINT "PK_da96729a8b113377cfb6a62439c" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "IDX_assets_category" ON "assets"  ("category") `);
         await queryRunner.query(`CREATE TYPE "public"."inventory_items_status_enum" AS ENUM('Available', 'Reserved', 'Assigned', 'Inactive')`);
         await queryRunner.query(`CREATE TYPE "public"."inventory_items_location_enum" AS ENUM('Cebu', 'Bacolod', 'Makati', 'Ortigas', 'Davao')`);

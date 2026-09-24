@@ -179,7 +179,7 @@ export class RequestsService {
           const availableUnits = await manager
             .createQueryBuilder(InventoryItem, 'inventory')
             .setLock('pessimistic_write')
-            .where('inventory.assetId = :assetId', { assetId: asset.id })
+            .where('inventory.asset_id = :assetId', { assetId: asset.id })
             .andWhere('inventory.status = :status', {
               status: InventoryItemStatus.AVAILABLE,
             })
@@ -289,13 +289,13 @@ export class RequestsService {
 
     const counts = await this.requestsRepository.manager
       .createQueryBuilder(InventoryItem, 'inventory')
-      .select('inventory.assetId', 'assetId')
+      .select('inventory.asset_id', 'assetId')
       .addSelect('COUNT(inventory.id)', 'count')
-      .where('inventory.assetId IN (:...assetIds)', { assetIds })
+      .where('inventory.asset_id IN (:...assetIds)', { assetIds })
       .andWhere('inventory.status = :status', {
         status: InventoryItemStatus.AVAILABLE,
       })
-      .groupBy('inventory.assetId')
+      .groupBy('inventory.asset_id')
       .getRawMany<{ assetId: number; count: string }>();
 
     const stockByAssetId = new Map(
