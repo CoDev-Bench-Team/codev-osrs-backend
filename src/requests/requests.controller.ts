@@ -17,6 +17,7 @@ import { CreateRequestDto } from './dto/create-request.dto.js';
 import { UpdateRequestDto } from './dto/update-request.dto.js';
 import { PaginatedRequestsQueryDto } from './dto/paginated-requests-query.dto.js';
 import { ApiValidationProblemResponse } from '../common/api-validation-problem-response.decorator.js';
+import { Roles } from '../auth/roles.decorator.js';
 
 @ApiTags('Requests')
 @Controller('requests')
@@ -61,6 +62,7 @@ export class RequestsController {
       'Drives approve, reject (with a reason), release (ready_for_pickup or for_delivery) and complete. Illegal status transitions are refused with a 409.',
   })
   @ApiValidationProblemResponse(UpdateRequestDto)
+  @Roles('admin')
   @Patch(':id')
   update(
     @Param('id', ParseIntPipe) id: number,

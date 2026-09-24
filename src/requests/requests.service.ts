@@ -322,13 +322,13 @@ export class RequestsService {
       // leave it alone — it stays assigned.
       if (status === RequestStatus.APPROVED) {
         await this.moveReservedUnits(manager, request, {
-          status: AssetInventoryStatus.ASSIGNED,
+          status: InventoryItemStatus.ASSIGNED,
           assignedTo: request.requestor,
           assignedAt: changedAt,
         });
       } else if (status === RequestStatus.REJECTED) {
         await this.moveReservedUnits(manager, request, {
-          status: AssetInventoryStatus.AVAILABLE,
+          status: InventoryItemStatus.AVAILABLE,
           assignedTo: null,
           assignedAt: null,
         });
@@ -381,18 +381,18 @@ export class RequestsService {
     manager: EntityManager,
     request: Request,
     changes: {
-      status: AssetInventoryStatus;
+      status: InventoryItemStatus;
       assignedTo: User | null;
       assignedAt: Date | null;
     },
   ): Promise<void> {
     for (const item of request.items) {
       const reserved = await manager
-        .createQueryBuilder(AssetInventory, 'inventory')
+        .createQueryBuilder(InventoryItem, 'inventory')
         .setLock('pessimistic_write')
-        .where('inventory.assetId = :assetId', { assetId: item.asset.id })
+        .where('inventory.asset_id = :assetId', { assetId: item.asset.id })
         .andWhere('inventory.status = :status', {
-          status: AssetInventoryStatus.RESERVED,
+          status: InventoryItemStatus.RESERVED,
         })
         .orderBy('inventory.id', 'ASC')
         .take(item.quantity)
@@ -403,7 +403,7 @@ export class RequestsService {
       }
 
       await manager.update(
-        AssetInventory,
+        InventoryItem,
         reserved.map((unit) => unit.id),
         changes,
       );
