@@ -1,5 +1,4 @@
 import {
-  IsArray,
   IsEnum,
   IsInt,
   IsNotEmpty,
@@ -7,73 +6,83 @@ import {
   IsString,
   MaxLength,
   Min,
-  ValidateNested,
+  ValidateIf,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { AssetCategory, AssetLocation, AssetSpec } from '../entities/asset.entity.js';
+import { AssetCategory } from '../entities/asset.entity.js';
 
-class AssetSpecDto implements AssetSpec {
-  @ApiPropertyOptional({ description: 'The label of the custom spec field.', example: 'Color' })
-  @IsNotEmpty()
-  @IsString()
-  @MaxLength(255)
-  key: string;
-
-  @ApiPropertyOptional({ description: 'The value of the custom spec field.', example: 'Black' })
-  @IsNotEmpty()
-  @IsString()
-  @MaxLength(1000)
-  value: string;
-}
+// @IsOptional() skips validation for both undefined and null, so fields that
+// may be cleared use it, while fields backed by NOT NULL columns use
+// @ValidateIf to skip only undefined and reject null.
+const isDefined = (_: object, value: unknown) => value !== undefined;
 
 export class UpdateAssetDto {
   @ApiPropertyOptional({
-    description: 'Base64-encoded image data for the item, optionally prefixed with a data URI scheme (e.g. "data:image/png;base64,...").',
+    description: 'Base64-encoded image data for the item, optionally prefixed with a data URI scheme (e.g. "data:image/png;base64,..."). Pass null to clear it.',
     example: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    nullable: true,
   })
   @IsOptional()
   @IsString()
-  imageBase64?: string;
+  imageBase64?: string | null;
 
   @ApiPropertyOptional({ description: 'The name of the item.', example: 'External Keyboard' })
-  @IsOptional()
+  @ValidateIf(isDefined)
   @IsNotEmpty()
   @IsString()
   @MaxLength(255)
   name?: string;
 
+  @ApiPropertyOptional({ description: 'The category the item belongs to.', enum: AssetCategory, example: AssetCategory.LAPTOP })
+  @ValidateIf(isDefined)
+  @IsEnum(AssetCategory)
+  category?: AssetCategory;
+
   @ApiPropertyOptional({ description: 'The brand or model of the item.', example: 'Logitech MX Keys' })
-  @IsOptional()
+  @ValidateIf(isDefined)
+  @IsNotEmpty()
   @IsString()
   @MaxLength(255)
   model?: string;
 
-  @ApiPropertyOptional({ description: 'The category the item belongs to.', enum: AssetCategory, example: AssetCategory.LAPTOP })
+  @ApiPropertyOptional({ description: 'A free-form description of the item. Pass null to clear it.', example: 'Business laptop with a 14-inch display.', nullable: true })
   @IsOptional()
-  @IsEnum(AssetCategory)
-  type?: AssetCategory;
+  @IsString()
+  @MaxLength(2048)
+  description?: string | null;
 
-  @ApiPropertyOptional({ description: 'The office location the item belongs to.', enum: AssetLocation, example: AssetLocation.CEBU })
+  @ApiPropertyOptional({ description: 'The RAM spec of the item. Pass null to clear it.', example: '16GB', nullable: true })
   @IsOptional()
-  @IsEnum(AssetLocation)
-  location?: AssetLocation;
+  @IsString()
+  @MaxLength(255)
+  ram?: string | null;
 
-  @ApiPropertyOptional({ description: 'Custom spec fields for the item.', type: [AssetSpecDto] })
+  @ApiPropertyOptional({ description: 'The processor spec of the item. Pass null to clear it.', example: 'Intel Core i7-1355U', nullable: true })
   @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => AssetSpecDto)
-  specs?: AssetSpecDto[];
+  @IsString()
+  @MaxLength(255)
+  processor?: string | null;
 
-  @ApiPropertyOptional({ description: 'The stock quantity for the item.', example: 0 })
+  @ApiPropertyOptional({ description: 'The graphics spec of the item. Pass null to clear it.', example: 'Intel Iris Xe Graphics', nullable: true })
   @IsOptional()
-  @IsInt()
-  @Min(0)
-  quantity?: number;
+  @IsString()
+  @MaxLength(255)
+  graphics?: string | null;
+
+  @ApiPropertyOptional({ description: 'The operating system spec of the item. Pass null to clear it.', example: 'Windows 11 Pro', nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  operatingSystem?: string | null;
+
+  @ApiPropertyOptional({ description: 'The storage spec of the item. Pass null to clear it.', example: '512GB SSD', nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  storage?: string | null;
 
   @ApiPropertyOptional({ description: 'The stock quantity at which the item is considered low in stock.', example: 5 })
-  @IsOptional()
+  @ValidateIf(isDefined)
   @IsInt()
   @Min(0)
   lowQtyAlert?: number;

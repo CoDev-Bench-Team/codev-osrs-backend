@@ -4,7 +4,7 @@ import { Asset } from '../../assets/entities/asset.entity.js';
 import { Request } from './request.entity.js';
 
 /** One line item on a `Request`, joined to `Asset` (and, transitively,
- * `AssetInventory`) rather than snapshotting the asset's name — per PR #79
+ * `InventoryItem`) rather than snapshotting the asset's name — per PR #79
  * review. */
 @Entity({ name: 'request_assets' })
 export class RequestAsset {

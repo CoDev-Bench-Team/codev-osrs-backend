@@ -1,5 +1,15 @@
-import { Entity, Column, PrimaryGeneratedColumn, Index } from "typeorm";
-import { AuditableEntity } from '../../common/auditable.base.js';
+import {
+    Entity,
+    Column,
+    PrimaryGeneratedColumn,
+    Index,
+    CreateDateColumn,
+    DeleteDateColumn,
+    ManyToOne,
+    UpdateDateColumn,
+} from "typeorm";
+import type { Relation } from 'typeorm';
+import { User } from '../../users/entities/user.entity.js';
 
 export enum AssetCategory {
     LAPTOP = 'Laptop',
@@ -17,33 +27,24 @@ export enum AssetLocation {
     CEBU = 'Cebu',
     BACOLOD = 'Bacolod',
     MAKATI = 'Makati',
-    PASIG = 'Pasig',
+    ORTIGAS = 'Ortigas',
     DAVAO = 'Davao',
 }
 
-export interface AssetSpec {
-    key: string;
-    value: string;
-}
-
 @Entity({ name: 'assets' })
-export class Asset extends AuditableEntity {
+export class Asset {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @Index()
-    @Column({ type: 'enum', enum: AssetCategory })
-    type: AssetCategory;
+    @Index('IDX_assets_category')
+    @Column({ type: 'enum', enum: AssetCategory, default: AssetCategory.OTHER })
+    category: AssetCategory;
 
     @Column({ type: 'varchar', length: 255 })
     name: string;
 
-    @Column({ type: 'varchar', length: 255, nullable: true })
-    model: string | null;
-
-    @Index()
-    @Column({ type: 'enum', enum: AssetLocation })
-    location: AssetLocation;
+    @Column({ type: 'varchar', length: 255 })
+    model: string;
 
     @Column()
     lowQtyAlert: number;
@@ -51,10 +52,39 @@ export class Asset extends AuditableEntity {
     @Column({ type: 'text', nullable: true })
     imageBase64: string | null;
 
-    @Column({ type: 'jsonb', default: [], nullable: true })
-    specs?: AssetSpec[];
+    @Column({ type: 'text', nullable: true })
+    description: string | null;
 
-    // Inactive items cannot be added to new requests (spec FR-005).
-    @Column({ type: 'boolean', default: true })
-    isActive: boolean;
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    ram: string | null;
+
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    processor: string | null;
+
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    graphics: string | null;
+
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    operatingSystem: string | null;
+
+    @Column({ type: 'varchar', length: 255, nullable: true })
+    storage: string | null;
+
+    @CreateDateColumn()
+    createdAt: Date;
+
+    @ManyToOne(() => User, { nullable: true })
+    createdBy: Relation<User | null>;
+
+    @UpdateDateColumn({ nullable: true })
+    updatedAt: Date | null;
+
+    @ManyToOne(() => User, { nullable: true })
+    updatedBy: Relation<User | null>;
+
+    @DeleteDateColumn({ nullable: true })
+    deletedAt: Date | null;
+
+    @ManyToOne(() => User, { nullable: true })
+    deletedBy: Relation<User | null>;
 }

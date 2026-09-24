@@ -1,14 +1,4 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  ParseIntPipe,
-  Patch,
-  Post,
-  Query,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AssetsService } from './assets.service.js';
 import { CreateAssetDto } from './dto/create-asset.dto.js';
@@ -22,10 +12,10 @@ import { ApiValidationProblemResponse } from '../common/api-validation-problem-r
 export class AssetsController {
   constructor(private readonly assetsService: AssetsService) {}
 
-  @ApiOperation({ summary: 'Retrieves a paginated list of assets.' })
+  @ApiOperation({ summary: 'Retrieves a paginated list of assets, optionally filtered by search text, category, office location, and stock level.' })
   @Get()
-  paginate(@Query() paginatedAssetsQueryDto: PaginatedAssetsQueryDto) {
-    return this.assetsService.paginate(paginatedAssetsQueryDto);
+  list(@Query() paginatedAssetsQueryDto: PaginatedAssetsQueryDto) {
+    return this.assetsService.list(paginatedAssetsQueryDto);
   }
 
   @ApiOperation({
