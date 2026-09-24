@@ -6,9 +6,9 @@ import { RequestAsset } from './entities/request-asset.entity.js';
 import { User } from '../users/entities/user.entity.js';
 import { Asset } from '../assets/entities/asset.entity.js';
 import {
-  AssetInventory,
-  AssetInventoryStatus,
-} from '../assets/entities/asset-inventory.entity.js';
+  InventoryItem,
+  InventoryItemStatus,
+} from '../inventory-items/entities/inventory-item.entity.js';
 import { MailerService } from '../mailer/mailer.service.js';
 import { CreateRequestDto } from './dto/create-request.dto.js';
 import { UpdateRequestDto } from './dto/update-request.dto.js';
@@ -76,7 +76,7 @@ export class RequestsService {
       }
       if (itemName) {
         filtered.andWhere(
-          `request.id IN (SELECT ra."requestId" FROM request_assets ra INNER JOIN assets a ON a.id = ra."assetId" WHERE a.name ILIKE :itemName)`,
+          `request.id IN (SELECT ra."request_id" FROM request_assets ra INNER JOIN assets a ON a.id = ra."asset_id" WHERE a.name ILIKE :itemName)`,
           { itemName: `%${itemName}%` },
         );
       }
@@ -163,7 +163,7 @@ export class RequestsService {
     // its RequestAsset lines, via cascade) in one atomic transaction: either
     // all lines succeed and stock is decremented for each, or nothing is
     // created and nothing is reserved (FR-005/006). Reservation locks the
-    // AssetInventory rows being claimed (`FOR UPDATE`, in a stable id order)
+    // InventoryItem rows being claimed (`FOR UPDATE`, in a stable id order)
     // so concurrent submits for the last unit can't both succeed (ADR-0002).
     const savedRequest = await this.requestsRepository.manager.transaction(
       async (manager) => {
@@ -176,18 +176,12 @@ export class RequestsService {
               `Asset with ID '${line.assetId}' could not be found.`,
             );
           }
-          if (!asset.isActive) {
-            throw new BadRequestException(
-              `Asset '${asset.name}' is not active and cannot be requested.`,
-            );
-          }
-
           const availableUnits = await manager
-            .createQueryBuilder(AssetInventory, 'inventory')
+            .createQueryBuilder(InventoryItem, 'inventory')
             .setLock('pessimistic_write')
-            .where('inventory.assetId = :assetId', { assetId: asset.id })
+            .where('inventory.asset_id = :assetId', { assetId: asset.id })
             .andWhere('inventory.status = :status', {
-              status: AssetInventoryStatus.AVAILABLE,
+              status: InventoryItemStatus.AVAILABLE,
             })
             .orderBy('inventory.id', 'ASC')
             .take(line.quantity)
@@ -200,9 +194,9 @@ export class RequestsService {
           }
 
           await manager.update(
-            AssetInventory,
+            InventoryItem,
             availableUnits.map((unit) => unit.id),
-            { status: AssetInventoryStatus.RESERVED },
+            { status: InventoryItemStatus.RESERVED },
           );
 
           requestItems.push(
@@ -280,7 +274,7 @@ export class RequestsService {
 
   /**
    * Attaches each item's current available stock (same counting logic as
-   * `AssetsService.attachQuantities()`: `AssetInventory` rows with status
+  * `AssetsService.attachQuantities()`: `InventoryItem` rows with status
    * `AVAILABLE`, grouped by asset) — per PR #79 review, so an admin view can
    * show live stock alongside a request's line items without a second
    * round-trip.
@@ -294,14 +288,14 @@ export class RequestsService {
     }
 
     const counts = await this.requestsRepository.manager
-      .createQueryBuilder(AssetInventory, 'inventory')
-      .select('inventory.assetId', 'assetId')
+      .createQueryBuilder(InventoryItem, 'inventory')
+      .select('inventory.asset_id', 'assetId')
       .addSelect('COUNT(inventory.id)', 'count')
-      .where('inventory.assetId IN (:...assetIds)', { assetIds })
+      .where('inventory.asset_id IN (:...assetIds)', { assetIds })
       .andWhere('inventory.status = :status', {
-        status: AssetInventoryStatus.AVAILABLE,
+        status: InventoryItemStatus.AVAILABLE,
       })
-      .groupBy('inventory.assetId')
+      .groupBy('inventory.asset_id')
       .getRawMany<{ assetId: number; count: string }>();
 
     const stockByAssetId = new Map(

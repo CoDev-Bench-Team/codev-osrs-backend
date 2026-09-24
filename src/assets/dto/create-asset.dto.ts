@@ -1,5 +1,4 @@
 import {
-  IsArray,
   IsDefined,
   IsEnum,
   IsInt,
@@ -8,27 +7,9 @@ import {
   IsString,
   MaxLength,
   Min,
-  ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { AssetCategory, AssetLocation, AssetSpec } from '../entities/asset.entity.js';
-
-class AssetSpecDto implements AssetSpec {
-  @ApiProperty({ description: 'The label of the custom spec field.', example: 'Color' })
-  @IsDefined()
-  @IsNotEmpty()
-  @IsString()
-  @MaxLength(255)
-  key: string;
-
-  @ApiProperty({ description: 'The value of the custom spec field.', example: 'Black' })
-  @IsDefined()
-  @IsNotEmpty()
-  @IsString()
-  @MaxLength(1000)
-  value: string;
-}
+import { AssetCategory } from '../entities/asset.entity.js';
 
 export class CreateAssetDto {
   @ApiPropertyOptional({
@@ -46,36 +27,54 @@ export class CreateAssetDto {
   @MaxLength(255)
   name: string;
 
-  @ApiPropertyOptional({ description: 'The brand or model of the item.', example: 'Logitech MX Keys' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  model?: string;
-
   @ApiProperty({ description: 'The category the item belongs to.', enum: AssetCategory, example: AssetCategory.LAPTOP })
   @IsDefined()
   @IsNotEmpty()
   @IsEnum(AssetCategory)
-  type: AssetCategory;
+  category: AssetCategory;
 
-  @ApiProperty({ description: 'The office location the item belongs to.', enum: AssetLocation, example: AssetLocation.CEBU })
+  @ApiProperty({ description: 'The brand or model of the item.', example: 'Logitech MX Keys' })
   @IsDefined()
   @IsNotEmpty()
-  @IsEnum(AssetLocation)
-  location: AssetLocation;
+  @IsString()
+  @MaxLength(255)
+  model: string;
 
-  @ApiPropertyOptional({ description: 'Custom spec fields for the item.', type: [AssetSpecDto] })
+  @ApiPropertyOptional({ description: 'A free-form description of the item.', example: 'Business laptop with a 14-inch display.' })
   @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => AssetSpecDto)
-  specs?: AssetSpecDto[];
+  @IsString()
+  @MaxLength(2048)
+  description?: string;
 
-  @ApiPropertyOptional({ description: 'The initial stock quantity for the item.', example: 0, default: 0 })
+  @ApiPropertyOptional({ description: 'The RAM spec of the item.', example: '16GB' })
   @IsOptional()
-  @IsInt()
-  @Min(0)
-  quantity?: number = 0;
+  @IsString()
+  @MaxLength(255)
+  ram?: string;
+
+  @ApiPropertyOptional({ description: 'The processor spec of the item.', example: 'Intel Core i7-1355U' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  processor?: string;
+
+  @ApiPropertyOptional({ description: 'The graphics spec of the item.', example: 'Intel Iris Xe Graphics' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  graphics?: string;
+
+  @ApiPropertyOptional({ description: 'The operating system spec of the item.', example: 'Windows 11 Pro' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  operatingSystem?: string;
+
+  @ApiPropertyOptional({ description: 'The storage spec of the item.', example: '512GB SSD' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  storage?: string;
 
   @ApiPropertyOptional({ description: 'The stock quantity at which the item is considered low in stock.', example: 5, default: 5 })
   @IsOptional()
