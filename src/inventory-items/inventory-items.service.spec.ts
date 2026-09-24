@@ -1,22 +1,22 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { InventoryItem } from '../inventory-items/entities/inventory-item.entity.js';
-import { Asset } from './entities/asset.entity.js';
-import { AssetsService } from './assets.service.js';
+import { Asset } from '../assets/entities/asset.entity.js';
+import { InventoryItemsService } from './inventory-items.service.js';
+import { InventoryItem } from './entities/inventory-item.entity.js';
 
-describe('AssetsService', () => {
-  let service: AssetsService;
+describe('InventoryItemsService', () => {
+  let service: InventoryItemsService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        AssetsService,
+        InventoryItemsService,
         { provide: getRepositoryToken(Asset), useValue: {} },
         { provide: getRepositoryToken(InventoryItem), useValue: {} },
       ],
     }).compile();
 
-    service = module.get<AssetsService>(AssetsService);
+    service = module.get<InventoryItemsService>(InventoryItemsService);
   });
 
   it('should be defined', () => {

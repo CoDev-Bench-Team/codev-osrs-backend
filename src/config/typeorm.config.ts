@@ -2,6 +2,7 @@ import { config } from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DataSource } from 'typeorm';
+import { SnakeCaseNamingStrategy } from './snake-case-naming.strategy.js';
 
 // static import so Vercel's file tracer bundles pg (TypeORM loads it dynamically otherwise)
 import 'pg';
@@ -19,6 +20,7 @@ export const dbConfig = {
   password: process.env.POSTGRESQL_PASSWORD ?? 'admin',
   database: process.env.POSTGRESQL_DATABASE ?? 'codev_osrs_db',
   entities: [path.join(__dirname, '..', '**/*.entity{.ts,.js}')],
+  namingStrategy: new SnakeCaseNamingStrategy(),
   synchronize: false,
   migrations: [path.join(__dirname, '..', 'migrations/*{.ts,.js}')],
   migrationsRun: false,

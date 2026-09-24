@@ -21,7 +21,7 @@ export enum UserLocation {
   CEBU = 'Cebu',
   BACOLOD = 'Bacolod',
   MAKATI = 'Makati',
-  PASIG = 'Pasig',
+  ORTIGAS = 'Ortigas',
   DAVAO = 'Davao',
 }
 
