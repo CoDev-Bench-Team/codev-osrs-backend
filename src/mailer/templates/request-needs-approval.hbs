@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Your request is in</title>
+        <title>A new request needs your approval</title>
         <style>
             body {
                 margin: 0;
@@ -24,6 +24,11 @@
                 }
                 .title {
                     font-size: 28px !important;
+                }
+                .meta-office {
+                    display: block !important;
+                    padding-top: 6px !important;
+                    text-align: left !important;
                 }
             }
         </style>
@@ -58,13 +63,18 @@
                                                 </tr>
                                             </table>
 
-                                            <h1 class="title" style="margin: 22px 0 14px; color: #1a1d21; font-size: 34px; line-height: 1.15;">Your request is in.</h1>
+                                            <h1 class="title" style="margin: 22px 0 14px; color: #1a1d21; font-size: 34px; line-height: 1.15;">A new request needs your approval.</h1>
 
                                             <p style="margin: 0 0 22px; color: #6d727b; font-size: 15px; line-height: 1.6;">
-                                                Hi {{firstName}} &mdash; we&rsquo;ve received your request and it&rsquo;s now waiting for your approver to take a look. You&rsquo;ll get another email as soon as its status changes.
+                                                {{requesterName}} ({{requesterOffice}}) submitted a request with {{itemCount}} item{{#unless singleItem}}s{{/unless}}. Here&rsquo;s a quick summary:
                                             </p>
 
-                                            <p style="margin: 0 0 24px; color: #8b9098; font-size: 13px;">Submitted {{submittedAt}}</p>
+                                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 24px;">
+                                                <tr>
+                                                    <td style="color: #8b9098; font-size: 13px;">Submitted {{submittedAt}}</td>
+                                                    <td class="meta-office" align="right" style="color: #8b9098; font-size: 13px;">Requester&rsquo;s Office: {{requesterOffice}}</td>
+                                                </tr>
+                                            </table>
 
                                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse; border-radius: 8px; overflow: hidden;">
                                                 <tr>
@@ -90,7 +100,7 @@
                                             </table>
                                             {{/if}}
 
-                                            <a href="{{viewUrl}}" style="display: inline-block; margin-top: 26px; padding: 14px 28px; border-radius: 6px; background-color: #cc2f4a; color: #ffffff; font-size: 15px; font-weight: bold; text-decoration: none;">View request</a>
+                                            <a href="{{reviewUrl}}" style="display: inline-block; margin-top: 26px; padding: 14px 28px; border-radius: 6px; background-color: #cc2f4a; color: #ffffff; font-size: 15px; font-weight: bold; text-decoration: none;">Review Request</a>
 
                                         </td>
                                     </tr>

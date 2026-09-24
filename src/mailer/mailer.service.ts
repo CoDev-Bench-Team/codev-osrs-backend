@@ -14,9 +14,39 @@ const requestSubmittedTemplate = readFile(
     'utf8',
 ).then((template) => Handlebars.compile(template, { strict: true }));
 
-interface RequestSubmittedLine {
+const requestNeedsApprovalTemplate = readFile(
+    new URL('./templates/request-needs-approval.hbs', import.meta.url),
+    'utf8',
+).then((template) => Handlebars.compile(template, { strict: true }));
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** Formats as "Sep 16, 2026, 9:42AM", matching the design. */
+const formatSubmittedAt = (date: Date): string => {
+    const hours24 = date.getHours();
+    const hours = hours24 % 12 === 0 ? 12 : hours24 % 12;
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const meridiem = hours24 < 12 ? 'AM' : 'PM';
+
+    return `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}, ${hours}:${minutes}${meridiem}`;
+};
+
+export interface RequestEmailLine {
     itemName: string;
     quantity: number;
+}
+
+/** Everything both new-request emails need about the request. */
+export interface NewRequestEmailContext {
+    requestId: number;
+    displayId: string;
+    submittedAt: Date;
+    purpose: string | null;
+    items: RequestEmailLine[];
+    requesterFirstName: string;
+    requesterFullName: string;
+    requesterOffice: string;
+    requesterEmail: string;
 }
 
 @Injectable()
@@ -41,27 +71,78 @@ export class MailerService {
         });
     }
 
-    /** Sends the "Request Submitted" email (process-flow.md §1) to the
-     * requestor. Best-effort: a delivery failure is swallowed rather than
-     * thrown, so it never rolls back an already-valid submit. */
+    /** Sends the "Your request is in" email to the employee who submitted it. */
     async sendRequestSubmittedEmail(
-        requestId: number,
-        requestorName: string,
-        recipient: string,
-        items: RequestSubmittedLine[],
+        context: NewRequestEmailContext,
     ): Promise<void> {
         const renderTemplate = await requestSubmittedTemplate;
 
+        await this.send({
+            to: context.requesterEmail,
+            subject: `Your request ${context.displayId} has been submitted`,
+            html: renderTemplate({
+                displayId: context.displayId,
+                firstName: context.requesterFirstName,
+                submittedAt: formatSubmittedAt(context.submittedAt),
+                items: context.items,
+                purpose: context.purpose,
+                viewUrl: `${process.env.PORTAL_URL}/requests/${context.requestId}`,
+                year: context.submittedAt.getFullYear(),
+            }),
+        });
+    }
+
+    /**
+     * Sends the "A new request needs your approval" email to every admin.
+     * Sent as a single message with the admins on BCC, so recipients don't
+     * see each other's addresses.
+     */
+    async sendRequestNeedsApprovalEmail(
+        context: NewRequestEmailContext,
+        adminEmails: string[],
+    ): Promise<void> {
+        if (!adminEmails.length) {
+            return;
+        }
+
+        const renderTemplate = await requestNeedsApprovalTemplate;
+
+        await this.send({
+            bcc: adminEmails,
+            subject: `${context.displayId} needs your approval`,
+            html: renderTemplate({
+                displayId: context.displayId,
+                requesterName: context.requesterFullName,
+                requesterOffice: context.requesterOffice,
+                itemCount: context.items.length,
+                singleItem: context.items.length === 1,
+                submittedAt: formatSubmittedAt(context.submittedAt),
+                items: context.items,
+                purpose: context.purpose,
+                reviewUrl: `${process.env.PORTAL_URL}/requests/${context.requestId}`,
+                year: context.submittedAt.getFullYear(),
+            }),
+        });
+    }
+
+    /**
+     * Best-effort delivery: a failure is swallowed rather than thrown, so it
+     * never rolls back an already-valid submit. Failures aren't persisted for
+     * MVP (see PR #79 review) — an outbox-based retry is planned later.
+     */
+    private async send(options: {
+        to?: string;
+        bcc?: string[];
+        subject: string;
+        html: string;
+    }): Promise<void> {
         try {
             await this.mailerService.sendMail({
                 from: process.env.SMTP_DEFAULT_FROM,
-                to: recipient,
-                subject: 'Office Supplies Request Submitted',
-                html: renderTemplate({ name: requestorName, requestId, items }),
+                ...options,
             });
         } catch {
-            // Delivery failure is not persisted for MVP (see PR #79 review) —
-            // an outbox-based retry is planned as a later improvement.
+            // Intentionally ignored — see above.
         }
     }
 }

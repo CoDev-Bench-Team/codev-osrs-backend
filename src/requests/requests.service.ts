@@ -3,13 +3,16 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Request, RequestStatus, TimelineEvent } from './entities/request.entity.js';
 import { RequestAsset } from './entities/request-asset.entity.js';
-import { User } from '../users/entities/user.entity.js';
+import { User, UserRole } from '../users/entities/user.entity.js';
 import { Asset } from '../assets/entities/asset.entity.js';
 import {
   InventoryItem,
   InventoryItemStatus,
 } from '../inventory-items/entities/inventory-item.entity.js';
-import { MailerService } from '../mailer/mailer.service.js';
+import {
+  MailerService,
+  NewRequestEmailContext,
+} from '../mailer/mailer.service.js';
 import { CreateRequestDto } from './dto/create-request.dto.js';
 import { UpdateRequestDto } from './dto/update-request.dto.js';
 import {
@@ -228,18 +231,47 @@ export class RequestsService {
     );
 
     // Sent after the transaction commits — a delivery failure must not roll
-    // back an already-valid submit.
-    await this.mailerService.sendRequestSubmittedEmail(
-      savedRequest.id,
-      requestor.firstName,
-      requestor.email,
-      savedRequest.items.map((item) => ({
+    // back an already-valid submit (BEN-111).
+    await this.sendNewRequestEmails(savedRequest, requestor);
+
+    return savedRequest;
+  }
+
+  /**
+   * On submit, notifies the requester ("Your request is in") and every admin
+   * ("A new request needs your approval") — BEN-111.
+   */
+  private async sendNewRequestEmails(
+    request: Request,
+    requestor: User,
+  ): Promise<void> {
+    const context: NewRequestEmailContext = {
+      requestId: request.id,
+      displayId: request.displayId,
+      submittedAt: request.createdAt,
+      purpose: request.purpose,
+      items: request.items.map((item) => ({
         itemName: item.asset.name,
         quantity: item.quantity,
       })),
-    );
+      requesterFirstName: requestor.firstName,
+      requesterFullName: `${requestor.firstName} ${requestor.lastName}`.trim(),
+      requesterOffice: requestor.location,
+      requesterEmail: requestor.email,
+    };
 
-    return savedRequest;
+    const admins = await this.requestsRepository.manager.find(User, {
+      where: { role: UserRole.ADMIN },
+      select: { email: true },
+    });
+
+    await Promise.all([
+      this.mailerService.sendRequestSubmittedEmail(context),
+      this.mailerService.sendRequestNeedsApprovalEmail(
+        context,
+        admins.map((admin) => admin.email),
+      ),
+    ]);
   }
 
   async update(
