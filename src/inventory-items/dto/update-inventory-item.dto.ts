@@ -52,7 +52,7 @@ export class UpdateInventoryItemDto {
 	@IsOptional()
 	@IsString()
 	@MaxLength(255)
-	bitLockerIdentifier?: string | null;
+	bitlockerIdentifier?: string | null;
 
 	@ApiPropertyOptional({ description: "This inventory item's BitLocker recovery key/PIN. Pass null to clear it.", example: '123456-654321-123456-654321-123456-654321-123456-654321', nullable: true })
 	@IsOptional()

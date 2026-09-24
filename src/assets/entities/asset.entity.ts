@@ -1,5 +1,15 @@
-import { Entity, Column, PrimaryGeneratedColumn, Index } from "typeorm";
-import { AuditableEntity } from '../../common/auditable.base.js';
+import {
+    Entity,
+    Column,
+    PrimaryGeneratedColumn,
+    Index,
+    CreateDateColumn,
+    DeleteDateColumn,
+    ManyToOne,
+    UpdateDateColumn,
+} from "typeorm";
+import type { Relation } from 'typeorm';
+import { User } from '../../users/entities/user.entity.js';
 
 export enum AssetCategory {
     LAPTOP = 'Laptop',
@@ -22,7 +32,7 @@ export enum AssetLocation {
 }
 
 @Entity({ name: 'assets' })
-export class Asset extends AuditableEntity {
+export class Asset {
     @PrimaryGeneratedColumn()
     id: number;
 
@@ -59,4 +69,22 @@ export class Asset extends AuditableEntity {
 
     @Column({ type: 'varchar', length: 255, nullable: true })
     storage: string | null;
+
+    @CreateDateColumn()
+    createdAt: Date;
+
+    @ManyToOne(() => User, { nullable: true })
+    createdBy: Relation<User | null>;
+
+    @UpdateDateColumn({ nullable: true })
+    updatedAt: Date | null;
+
+    @ManyToOne(() => User, { nullable: true })
+    updatedBy: Relation<User | null>;
+
+    @DeleteDateColumn({ nullable: true })
+    deletedAt: Date | null;
+
+    @ManyToOne(() => User, { nullable: true })
+    deletedBy: Relation<User | null>;
 }

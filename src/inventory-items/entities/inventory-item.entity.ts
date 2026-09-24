@@ -1,7 +1,15 @@
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, Index } from 'typeorm';
+import {
+	Entity,
+	Column,
+	PrimaryGeneratedColumn,
+	ManyToOne,
+	Index,
+	CreateDateColumn,
+	DeleteDateColumn,
+	UpdateDateColumn,
+} from 'typeorm';
 import type { Relation } from 'typeorm';
 import { User } from '../../users/entities/user.entity.js';
-import { AuditableEntity } from '../../common/auditable.base.js';
 import { Asset, AssetLocation } from '../../assets/entities/asset.entity.js';
 
 export enum InventoryItemStatus {
@@ -11,10 +19,10 @@ export enum InventoryItemStatus {
 	INACTIVE = 'Inactive',
 }
 
-@Entity({ name: 'asset_inventories' })
+@Entity({ name: 'inventory_items' })
 @Index(['asset', 'status'])
-@Index('UQ_asset_inventories_serialNumber', ['serialNumber'], { unique: true, where: '"deletedAt" IS NULL' })
-export class InventoryItem extends AuditableEntity {
+@Index('UQ_inventory_items_serial_number', ['serialNumber'], { unique: true, where: '"deleted_at" IS NULL' })
+export class InventoryItem {
 	@PrimaryGeneratedColumn()
 	id: number;
 
@@ -28,8 +36,13 @@ export class InventoryItem extends AuditableEntity {
 	@Column({ type: 'varchar', length: 255, nullable: true })
 	serialNumber: string | null;
 
-	@Column({ type: 'varchar', length: 255, nullable: true })
-	bitLockerIdentifier: string | null;
+	@Column({
+		type: 'varchar',
+		length: 255,
+		nullable: true,
+		name: 'bitlocker_identifier',
+	})
+	bitlockerIdentifier: string | null;
 
 	@Column({ type: 'varchar', length: 255, nullable: true })
 	recoveryPin: string | null;
@@ -67,4 +80,22 @@ export class InventoryItem extends AuditableEntity {
 
 	@Column({ type: 'timestamp', nullable: true })
 	purchasedAt: Date | null;
+
+	@CreateDateColumn()
+	createdAt: Date;
+
+	@ManyToOne(() => User, { nullable: true })
+	createdBy: Relation<User | null>;
+
+	@UpdateDateColumn({ nullable: true })
+	updatedAt: Date | null;
+
+	@ManyToOne(() => User, { nullable: true })
+	updatedBy: Relation<User | null>;
+
+	@DeleteDateColumn({ nullable: true })
+	deletedAt: Date | null;
+
+	@ManyToOne(() => User, { nullable: true })
+	deletedBy: Relation<User | null>;
 }

@@ -76,7 +76,7 @@ export class RequestsService {
       }
       if (itemName) {
         filtered.andWhere(
-          `request.id IN (SELECT ra."requestId" FROM request_assets ra INNER JOIN assets a ON a.id = ra."assetId" WHERE a.name ILIKE :itemName)`,
+          `request.id IN (SELECT ra."request_id" FROM request_assets ra INNER JOIN assets a ON a.id = ra."asset_id" WHERE a.name ILIKE :itemName)`,
           { itemName: `%${itemName}%` },
         );
       }

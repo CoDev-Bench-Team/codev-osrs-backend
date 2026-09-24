@@ -39,10 +39,10 @@ export class AssetsService {
         if (stockLevel) {
             // Same count attachQuantities reports: Available units, scoped to the location if given
             const availableCount = `(
-                SELECT COUNT(*) FROM asset_inventories inventory
-                WHERE inventory."assetId" = asset.id
+                                SELECT COUNT(*) FROM inventory_items inventory
+                                WHERE inventory."asset_id" = asset.id
                   AND inventory.status = :availableStatus
-                  AND inventory."deletedAt" IS NULL
+                                    AND inventory."deleted_at" IS NULL
                   ${location ? 'AND inventory.location = :location' : ''}
             )`;
             const stockLevelConditions: Record<AssetStockLevel, string> = {

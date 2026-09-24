@@ -49,7 +49,7 @@ export class CreateInventoryItemDto {
 	@IsOptional()
 	@IsString()
 	@MaxLength(255)
-	bitLockerIdentifier?: string;
+	bitlockerIdentifier?: string;
 
 	@ApiPropertyOptional({ description: "This inventory item's BitLocker recovery key/PIN.", example: '123456-654321-123456-654321-123456-654321-123456-654321' })
 	@IsOptional()
