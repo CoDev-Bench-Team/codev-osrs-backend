@@ -1,8 +1,23 @@
 import { Inject, Injectable } from '@nestjs/common';
 import Handlebars from 'handlebars';
 import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import type { Transporter } from 'nodemailer';
 import { User } from '../users/entities/user.entity.js';
+
+/**
+ * The "CoDev Supply Requests" header logo, embedded as an inline (CID)
+ * attachment rather than a data URI — Gmail strips base64 images, and a
+ * hosted URL would need the portal to be publicly reachable. Templates
+ * reference it as `cid:codev-supply-requests-logo`.
+ */
+const LOGO_ATTACHMENT = {
+    filename: 'logo-supply-requests.png',
+    path: fileURLToPath(
+        new URL('./assets/logo-supply-requests.png', import.meta.url),
+    ),
+    cid: 'codev-supply-requests-logo',
+};
 
 const welcomeTemplate = readFile(
     new URL('./templates/welcome.hbs', import.meta.url),
@@ -280,6 +295,7 @@ export class MailerService {
             await this.mailerService.sendMail({
                 from: process.env.SMTP_DEFAULT_FROM,
                 ...options,
+                attachments: [LOGO_ATTACHMENT],
             });
         } catch {
             // Intentionally ignored — see above.
