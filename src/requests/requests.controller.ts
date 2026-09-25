@@ -11,7 +11,7 @@ import {
   Req,
   HttpCode,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request as ExpressRequest } from 'express';
 import { RequestsService } from './requests.service.js';
 import { CreateRequestDto } from './dto/create-request.dto.js';
@@ -19,6 +19,10 @@ import { UpdateRequestDto } from './dto/update-request.dto.js';
 import { CancelRequestDto } from './dto/cancel-request.dto.js';
 import { PaginatedRequestsQueryDto } from './dto/paginated-requests-query.dto.js';
 import { PaginatedRequestHistoryQueryDto } from './dto/paginated-request-history-query.dto.js';
+import {
+  RequestCounts,
+  RequestCountsQueryDto,
+} from './dto/request-counts.dto.js';
 import { ApiValidationProblemResponse } from '../common/api-validation-problem-response.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 
@@ -45,7 +49,22 @@ export class RequestsController {
     );
   }
 
-  // Declared before `:id` so "history" isn't parsed as a request ID.
+  // `counts` and `history` are declared before `:id` so they aren't parsed
+  // as request IDs.
+  @ApiOperation({
+    summary: 'Counts requests per status, for filter chips and summary cards.',
+    description:
+      'Takes the same search filters as the list (not status) and the same scoping: admins count every request, employees their own. inProcessing = approved + ready_for_pickup + for_delivery. For the low-stock card, use GET /assets?stockLevel=low_stock.',
+  })
+  @ApiOkResponse({ type: RequestCounts })
+  @Get('counts')
+  counts(
+    @Query() countsQueryDto: RequestCountsQueryDto,
+    @Req() request: ExpressRequest,
+  ) {
+    return this.requestsService.counts(countsQueryDto, request.user!);
+  }
+
   @ApiOperation({
     summary: 'Retrieves the History: resolved requests, admin only.',
     description:

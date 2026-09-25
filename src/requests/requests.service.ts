@@ -5,7 +5,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, In, Repository } from 'typeorm';
+import {
+  EntityManager,
+  In,
+  Repository,
+  SelectQueryBuilder,
+} from 'typeorm';
 import { Request, RequestStatus, TimelineEvent } from './entities/request.entity.js';
 import { RequestAsset } from './entities/request-asset.entity.js';
 import { User, UserRole } from '../users/entities/user.entity.js';
@@ -29,6 +34,11 @@ import {
   PaginatedRequestHistoryQueryDto,
   RESOLVED_STATUSES,
 } from './dto/paginated-request-history-query.dto.js';
+import {
+  IN_PROCESSING_STATUSES,
+  RequestCounts,
+  RequestCountsQueryDto,
+} from './dto/request-counts.dto.js';
 import { PaginatedResult } from '../common/paginated-result.js';
 
 const RELATIONS = {
@@ -110,6 +120,98 @@ export class RequestsService {
   }
 
   /**
+   * Counts requests per status for the queue's filter chips and summary
+   * cards (FR-016), under the same viewer scoping and search filters as the
+   * list (the `status` filter itself is ignored, so every chip gets a count).
+   */
+  async counts(
+    query: RequestCountsQueryDto,
+    viewer: User,
+  ): Promise<RequestCounts> {
+    const rows = await this.filteredQuery(query, viewer)
+      .select('request.status', 'status')
+      .addSelect('COUNT(request.id)', 'count')
+      .groupBy('request.status')
+      .getRawMany<{ status: RequestStatus; count: string }>();
+
+    const byStatus = Object.fromEntries(
+      Object.values(RequestStatus).map((s) => [s, 0]),
+    ) as Record<RequestStatus, number>;
+    for (const { status, count } of rows) {
+      byStatus[status] = Number(count);
+    }
+
+    return {
+      total: Object.values(byStatus).reduce((sum, n) => sum + n, 0),
+      byStatus,
+      inProcessing: IN_PROCESSING_STATUSES.reduce(
+        (sum, s) => sum + byStatus[s],
+        0,
+      ),
+    };
+  }
+
+  /**
+   * The list's WHERE clause: viewer scoping (employees see only their own),
+   * an optional status whitelist, and the search filters.
+   *
+   * Filters on a query with no to-many join, so `skip`/`take` apply
+   * correctly. `itemName` needs the `items` -> `assets` join, which would
+   * fan out rows (breaking pagination) if done here — pushed into a subquery
+   * instead. `requestor` uses `leftJoinAndSelect` (not just `leftJoin`) even
+   * though only its columns are needed for filtering: TypeORM wraps any join
+   * + skip/take combination in an outer `SELECT DISTINCT` subquery, and that
+   * outer query can only reference columns the inner one actually selected
+   * — so ordering by a joined column (the employee-name sort) needs it
+   * selected, not just joined. Safe here since `requestor` is ManyToOne — no
+   * fan-out risk.
+   */
+  private filteredQuery(
+    query: Pick<
+      PaginatedRequestsQueryDto,
+      'status' | 'displayId' | 'requester' | 'itemName'
+    >,
+    viewer: User,
+    statuses?: RequestStatus[],
+  ): SelectQueryBuilder<Request> {
+    const { status, displayId, requester, itemName } = query;
+    const filtered = this.requestsRepository
+      .createQueryBuilder('request')
+      .leftJoinAndSelect('request.requestor', 'requestor');
+
+    if (viewer.role !== UserRole.ADMIN) {
+      filtered.andWhere('requestor.id = :viewerId', { viewerId: viewer.id });
+    }
+    if (statuses) {
+      filtered.andWhere('request.status IN (:...scopeStatuses)', {
+        scopeStatuses: statuses,
+      });
+    }
+    if (status) {
+      filtered.andWhere('request.status = :status', { status });
+    }
+    if (displayId) {
+      filtered.andWhere('request.displayId ILIKE :displayId', {
+        displayId: `%${displayId}%`,
+      });
+    }
+    if (requester) {
+      filtered.andWhere(
+        '(requestor.firstName ILIKE :requester OR requestor.lastName ILIKE :requester OR requestor.email ILIKE :requester)',
+        { requester: `%${requester}%` },
+      );
+    }
+    if (itemName) {
+      filtered.andWhere(
+        `request.id IN (SELECT ra."request_id" FROM request_assets ra INNER JOIN assets a ON a.id = ra."asset_id" WHERE a.name ILIKE :itemName)`,
+        { itemName: `%${itemName}%` },
+      );
+    }
+
+    return filtered;
+  }
+
+  /**
    * Shared by the queue and History: `scope.statuses` limits which statuses
    * can appear at all, and `scope.dateColumn` is what the newest / oldest
    * sorts order by.
@@ -122,62 +224,9 @@ export class RequestsService {
       dateColumn: 'createdAt' | 'resolvedAt';
     },
   ): Promise<PaginatedResult<Request>> {
-    const {
-      page = 1,
-      limit = 10,
-      status,
-      displayId,
-      requester,
-      itemName,
-      sort = RequestSortOrder.NEWEST,
-    } = query;
-
-    // Filters/paginates on a query with no to-many join, so `skip`/`take`
-    // apply correctly. `itemName` needs the `items` -> `assets` join, which
-    // would fan out rows (breaking pagination) if done here — pushed into a
-    // subquery instead. `requestor` uses `leftJoinAndSelect` (not just
-    // `leftJoin`) even though only its columns are needed for filtering:
-    // TypeORM wraps any join + skip/take combination in an outer
-    // `SELECT DISTINCT` subquery, and that outer query can only reference
-    // columns the inner one actually selected — so ordering by a joined
-    // column (the employee-name sort) needs it selected, not just joined.
-    // Safe here since `requestor` is ManyToOne — no fan-out risk.
-    const buildFilteredQuery = () => {
-      const filtered = this.requestsRepository
-        .createQueryBuilder('request')
-        .leftJoinAndSelect('request.requestor', 'requestor');
-
-      if (viewer.role !== UserRole.ADMIN) {
-        filtered.andWhere('requestor.id = :viewerId', { viewerId: viewer.id });
-      }
-      if (scope.statuses) {
-        filtered.andWhere('request.status IN (:...scopeStatuses)', {
-          scopeStatuses: scope.statuses,
-        });
-      }
-      if (status) {
-        filtered.andWhere('request.status = :status', { status });
-      }
-      if (displayId) {
-        filtered.andWhere('request.displayId ILIKE :displayId', {
-          displayId: `%${displayId}%`,
-        });
-      }
-      if (requester) {
-        filtered.andWhere(
-          '(requestor.firstName ILIKE :requester OR requestor.lastName ILIKE :requester OR requestor.email ILIKE :requester)',
-          { requester: `%${requester}%` },
-        );
-      }
-      if (itemName) {
-        filtered.andWhere(
-          `request.id IN (SELECT ra."request_id" FROM request_assets ra INNER JOIN assets a ON a.id = ra."asset_id" WHERE a.name ILIKE :itemName)`,
-          { itemName: `%${itemName}%` },
-        );
-      }
-
-      return filtered;
-    };
+    const { page = 1, limit = 10, sort = RequestSortOrder.NEWEST } = query;
+    const buildFilteredQuery = () =>
+      this.filteredQuery(query, viewer, scope.statuses);
 
     // `getManyAndCount()` is avoided here: TypeORM's automatic count-query
     // derivation drops joins that are only referenced by `orderBy` (not
