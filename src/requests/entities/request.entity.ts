@@ -60,7 +60,7 @@ export class Request {
 
   /** The admin who approved or rejected the request. */
   @ManyToOne(() => User, { nullable: true })
-  approvedBy: Relation<User | null>;
+  reviewedBy: Relation<User | null>;
 
   @Column({ type: 'jsonb', default: [] })
   timeline: TimelineEvent[];

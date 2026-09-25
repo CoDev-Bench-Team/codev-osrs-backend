@@ -28,7 +28,7 @@ import { PaginatedResult } from '../common/paginated-result.js';
 
 const RELATIONS = {
   requestor: true,
-  approvedBy: true,
+  reviewedBy: true,
   items: { asset: true },
 };
 
@@ -190,6 +190,7 @@ export class RequestsService {
     const savedRequest = await this.requestsRepository.manager.transaction(
       async (manager) => {
         const requestItems: RequestAsset[] = [];
+        const reservedUnitIds: number[] = [];
 
         for (const line of createRequestDto.items) {
           const asset = await manager.findOneBy(Asset, { id: line.assetId });
@@ -215,11 +216,8 @@ export class RequestsService {
             );
           }
 
-          await manager.update(
-            InventoryItem,
-            availableUnits.map((unit) => unit.id),
-            { status: InventoryItemStatus.RESERVED },
-          );
+          // Reserved below, once the request row exists to link them to.
+          reservedUnitIds.push(...availableUnits.map((unit) => unit.id));
 
           requestItems.push(
             manager.create(RequestAsset, { asset, quantity: line.quantity }),
@@ -244,6 +242,13 @@ export class RequestsService {
         // `items` cascades on save, inserting the RequestAsset rows too.
         const inserted = await manager.save(newRequest);
         inserted.displayId = `REQ-${inserted.createdAt.getFullYear()}-${inserted.id}`;
+
+        // Still locked from the reads above. Recording the request on each
+        // unit lets approve/reject move exactly these units later.
+        await manager.update(InventoryItem, reservedUnitIds, {
+          status: InventoryItemStatus.RESERVED,
+          request: { id: inserted.id },
+        });
 
         return manager.save(inserted);
       },
@@ -310,7 +315,7 @@ export class RequestsService {
     const allowedFrom = LEGAL_TRANSITIONS[status];
     if (!allowedFrom.includes(request.status)) {
       throw new ConflictException(
-        `A request with status '${request.status}' cannot be moved to '${status}'. Expected one of: ${allowedFrom.join(', ')}.`,
+        `A request with status '${request.status}' cannot be moved to '${status}'.`,
       );
     }
 
@@ -319,7 +324,9 @@ export class RequestsService {
     await this.requestsRepository.manager.transaction(async (manager) => {
       // The stock reserved at submit either goes out to the requester
       // (approve) or returns to the shelf (reject). Release and complete
-      // leave it alone — it stays assigned.
+      // leave it alone — it stays assigned. Assigned units keep their
+      // request link as a record of which request issued them; returned
+      // units drop it so a later request can claim them.
       if (status === RequestStatus.APPROVED) {
         await this.moveReservedUnits(manager, request, {
           status: InventoryItemStatus.ASSIGNED,
@@ -331,6 +338,7 @@ export class RequestsService {
           status: InventoryItemStatus.AVAILABLE,
           assignedTo: null,
           assignedAt: null,
+          request: null,
         });
       }
 
@@ -345,7 +353,7 @@ export class RequestsService {
           status === RequestStatus.REJECTED
             ? (rejectionReason ?? null)
             : request.rejectionReason,
-        approvedBy: isDecision ? actor : request.approvedBy,
+        reviewedBy: isDecision ? actor : request.reviewedBy,
         updatedBy: actor,
         timeline: [
           ...request.timeline,
@@ -371,11 +379,9 @@ export class RequestsService {
   }
 
   /**
-   * Moves the units this request reserved into a new state. Units are
-   * re-derived per line (the right asset, still `RESERVED`, capped at the
-   * line's quantity) rather than tracked explicitly on the request — see the
-   * note in `create()`. Locked in a stable id order so two concurrent
-   * decisions can't claim the same units.
+   * Moves the units this request reserved on submit (linked via
+   * `InventoryItem.request`, still `RESERVED`) into a new state. Locked in a
+   * stable id order so two concurrent decisions can't both move them.
    */
   private async moveReservedUnits(
     manager: EntityManager,
@@ -384,30 +390,28 @@ export class RequestsService {
       status: InventoryItemStatus;
       assignedTo: User | null;
       assignedAt: Date | null;
+      request?: null;
     },
   ): Promise<void> {
-    for (const item of request.items) {
-      const reserved = await manager
-        .createQueryBuilder(InventoryItem, 'inventory')
-        .setLock('pessimistic_write')
-        .where('inventory.asset_id = :assetId', { assetId: item.asset.id })
-        .andWhere('inventory.status = :status', {
-          status: InventoryItemStatus.RESERVED,
-        })
-        .orderBy('inventory.id', 'ASC')
-        .take(item.quantity)
-        .getMany();
+    const reserved = await manager
+      .createQueryBuilder(InventoryItem, 'inventory')
+      .setLock('pessimistic_write')
+      .where('inventory.request_id = :requestId', { requestId: request.id })
+      .andWhere('inventory.status = :status', {
+        status: InventoryItemStatus.RESERVED,
+      })
+      .orderBy('inventory.id', 'ASC')
+      .getMany();
 
-      if (!reserved.length) {
-        continue;
-      }
-
-      await manager.update(
-        InventoryItem,
-        reserved.map((unit) => unit.id),
-        changes,
-      );
+    if (!reserved.length) {
+      return;
     }
+
+    await manager.update(
+      InventoryItem,
+      reserved.map((unit) => unit.id),
+      changes,
+    );
   }
 
   /** Dispatches the email for whichever transition just happened. */
