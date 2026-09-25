@@ -54,8 +54,13 @@ export class RequestsService {
     private readonly mailerService: MailerService,
   ) {}
 
+  /**
+   * Lists requests for the Admin's Requests Queue, or — when `viewer` is an
+   * employee — only that employee's own requests (My Requests, FR-016).
+   */
   async paginate(
     query: PaginatedRequestsQueryDto,
+    viewer: User,
   ): Promise<PaginatedResult<Request>> {
     const {
       page = 1,
@@ -82,6 +87,9 @@ export class RequestsService {
         .createQueryBuilder('request')
         .leftJoinAndSelect('request.requestor', 'requestor');
 
+      if (viewer.role !== UserRole.ADMIN) {
+        filtered.andWhere('requestor.id = :viewerId', { viewerId: viewer.id });
+      }
       if (status) {
         filtered.andWhere('request.status = :status', { status });
       }
@@ -155,12 +163,22 @@ export class RequestsService {
     };
   }
 
-  async find(id: number): Promise<Request> {
+  /**
+   * Fetches one request. With a non-admin `viewer`, someone else's request is
+   * reported as not found rather than forbidden, so employees can't probe
+   * which request IDs exist. Internal callers omit `viewer`.
+   */
+  async find(id: number, viewer?: User): Promise<Request> {
     const request = await this.requestsRepository.findOne({
       where: { id },
       relations: RELATIONS,
     });
-    if (!request) {
+    if (
+      !request ||
+      (viewer &&
+        viewer.role !== UserRole.ADMIN &&
+        request.requestor.id !== viewer.id)
+    ) {
       throw new NotFoundException(
         `Request with ID '${id}' could not be found.`,
       );

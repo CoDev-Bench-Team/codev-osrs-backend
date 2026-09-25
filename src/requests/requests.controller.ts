@@ -27,19 +27,29 @@ export class RequestsController {
   @ApiOperation({
     summary: 'Retrieves a paginated list of requests.',
     description:
-      'Supports filtering by status, display ID, requester name/email, and requested item name, plus sorting by submission date.',
+      'Admins get every request (the Requests Queue); employees get only their own (My Requests). Supports filtering by status, display ID, requester name/email, and requested item name, plus sorting by submission date or employee name.',
   })
   @Get()
-  paginate(@Query() paginatedRequestsQueryDto: PaginatedRequestsQueryDto) {
-    return this.requestsService.paginate(paginatedRequestsQueryDto);
+  paginate(
+    @Query() paginatedRequestsQueryDto: PaginatedRequestsQueryDto,
+    @Req() request: ExpressRequest,
+  ) {
+    // The global AuthGuard rejects unauthenticated requests before this
+    // handler runs, so `request.user` is always populated here.
+    return this.requestsService.paginate(
+      paginatedRequestsQueryDto,
+      request.user!,
+    );
   }
 
   @ApiOperation({
     summary: 'Fetches a single request by its numeric identifier.',
+    description:
+      "Employees can only fetch their own requests; anyone else's returns 404.",
   })
   @Get(':id')
-  find(@Param('id', ParseIntPipe) id: number) {
-    return this.requestsService.find(id);
+  find(@Param('id', ParseIntPipe) id: number, @Req() request: ExpressRequest) {
+    return this.requestsService.find(id, request.user!);
   }
 
   @ApiOperation({
@@ -74,7 +84,11 @@ export class RequestsController {
     return this.requestsService.update(id, updateRequestDto, request.user!);
   }
 
-  @ApiOperation({ summary: 'Removes a request from the system by ID.' })
+  @ApiOperation({
+    summary: 'Removes a request from the system by ID.',
+    description: 'Admin only.',
+  })
+  @Roles('admin')
   @Delete(':id')
   delete(@Param('id', ParseIntPipe) id: number) {
     return this.requestsService.delete(id);
