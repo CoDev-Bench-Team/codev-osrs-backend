@@ -40,8 +40,19 @@ const LEGAL_TRANSITIONS: Record<RequestStatus, RequestStatus[]> = {
   [RequestStatus.PENDING_APPROVAL]: [],
   [RequestStatus.APPROVED]: [RequestStatus.PENDING_APPROVAL],
   [RequestStatus.REJECTED]: [RequestStatus.PENDING_APPROVAL],
-  [RequestStatus.READY_FOR_PICKUP]: [RequestStatus.APPROVED],
-  [RequestStatus.FOR_DELIVERY]: [RequestStatus.APPROVED],
+  // The two handover states are peers, not a sequence (FR-011): an approved
+  // request goes to either, and can switch between them. Ready for pickup
+  // may be set again to correct the pickup location; re-setting for
+  // delivery would change nothing, so it isn't allowed.
+  [RequestStatus.READY_FOR_PICKUP]: [
+    RequestStatus.APPROVED,
+    RequestStatus.FOR_DELIVERY,
+    RequestStatus.READY_FOR_PICKUP,
+  ],
+  [RequestStatus.FOR_DELIVERY]: [
+    RequestStatus.APPROVED,
+    RequestStatus.READY_FOR_PICKUP,
+  ],
   [RequestStatus.COMPLETED]: [
     RequestStatus.READY_FOR_PICKUP,
     RequestStatus.FOR_DELIVERY,
@@ -370,9 +381,11 @@ export class RequestsService {
     }
 
     const changedAt = new Date();
+    let previousStatus = request.status;
 
     await this.requestsRepository.manager.transaction(async (manager) => {
       const currentStatus = await this.lockedStatus(manager, id);
+      previousStatus = currentStatus;
       if (!LEGAL_TRANSITIONS[status].includes(currentStatus)) {
         throw new ConflictException(
           `A request with status '${currentStatus}' cannot be moved to '${status}'.`,
@@ -452,7 +465,13 @@ export class RequestsService {
 
     // Sent after the transaction commits — a delivery failure must not roll
     // back an already-valid status change.
-    await this.sendStatusChangeEmail(updated, status, changedAt, rejectionReason);
+    await this.sendStatusChangeEmail(
+      updated,
+      status,
+      changedAt,
+      rejectionReason,
+      previousStatus,
+    );
 
     return updated;
   }
@@ -593,8 +612,10 @@ export class RequestsService {
     status: RequestStatus,
     changedAt: Date,
     reason?: string,
+    previousStatus?: RequestStatus,
   ): Promise<void> {
     const context: RequestEmailContext = {
+      previousStatus,
       requestId: request.id,
       displayId: request.displayId,
       submittedAt: changedAt,

@@ -71,7 +71,23 @@ export interface RequestEmailContext {
     requesterEmail: string;
     /** Only for status emails, once the request is ready for pickup. */
     pickupLocation?: string | null;
+    /** Only for status emails: the status the request moved from. */
+    previousStatus?: string;
 }
+
+/** How each request status reads in an email sentence. */
+const STATUS_LABELS: Record<string, string> = {
+    pending_approval: 'Pending Approval',
+    approved: 'Approved',
+    ready_for_pickup: 'Ready for pickup',
+    for_delivery: 'For Delivery',
+    rejected: 'Rejected',
+    completed: 'Completed',
+    cancelled: 'Cancelled',
+};
+
+const statusLabel = (status: string | undefined, fallback: string) =>
+    (status && STATUS_LABELS[status]) ?? fallback;
 
 @Injectable()
 export class MailerService {
@@ -194,7 +210,10 @@ export class MailerService {
             pillBackground: '#e8f0fd',
             pillColor: '#1d4ed8',
             title: 'Your request is ready for pickup',
-            body: `Hi ${context.requesterFirstName} — Admin changed the status of your request from Approved to Ready for pickup.`,
+            body:
+                context.previousStatus === 'ready_for_pickup'
+                    ? `Hi ${context.requesterFirstName} — Admin updated where to collect your request.`
+                    : `Hi ${context.requesterFirstName} — Admin changed the status of your request from ${statusLabel(context.previousStatus, 'Approved')} to Ready for pickup.`,
             pickup: context.pickupLocation
                 ? `${context.pickupLocation}, ${context.requesterOffice} office`
                 : `${context.requesterOffice} office`,
@@ -214,7 +233,7 @@ export class MailerService {
             pillBackground: '#fdeaf2',
             pillColor: '#d6336c',
             title: 'Your request is now for delivery',
-            body: `Hi ${context.requesterFirstName} — Admin changed the status of your request from Approved to For Delivery.`,
+            body: `Hi ${context.requesterFirstName} — Admin changed the status of your request from ${statusLabel(context.previousStatus, 'Approved')} to For Delivery.`,
             dateLine: `For Delivery ${formatSubmittedAt(context.submittedAt)}`,
             showItems: true,
             ctaLabel: 'View request',
