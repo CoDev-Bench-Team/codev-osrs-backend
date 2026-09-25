@@ -236,6 +236,28 @@ export class MailerService {
         });
     }
 
+    /** "Your request was cancelled" (FR-014). Slate pill, as the design
+     * colours Cancelled; shows the reason, like a rejection. */
+    async sendRequestCancelledEmail(
+        context: RequestEmailContext,
+        reason: string,
+        cancelledByRequester: boolean,
+    ): Promise<void> {
+        await this.sendStatusChange(context, {
+            subject: `Your request ${context.displayId} was cancelled`,
+            pillLabel: 'Cancelled',
+            pillBackground: '#eef0f3',
+            pillColor: '#5b6270',
+            title: 'Your request was cancelled',
+            body: cancelledByRequester
+                ? `Hi ${context.requesterFirstName} — you cancelled this request, and the items it held have been released. Your reason:`
+                : `Hi ${context.requesterFirstName} — Admin cancelled your request because it can't be fulfilled. Here's why:`,
+            reason,
+            ctaLabel: 'Submit a new request',
+            ctaUrl: `${process.env.PORTAL_URL}/requests`,
+        });
+    }
+
     private async sendStatusChange(
         context: RequestEmailContext,
         variant: {

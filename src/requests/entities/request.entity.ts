@@ -21,6 +21,7 @@ export enum RequestStatus {
   FOR_DELIVERY = 'for_delivery',
   REJECTED = 'rejected',
   COMPLETED = 'completed',
+  CANCELLED = 'cancelled',
 }
 
 /** One entry in `Request.timeline`, recording each status transition. */
@@ -69,6 +70,14 @@ export class Request {
   /** The admin who approved or rejected the request. */
   @ManyToOne(() => User, { nullable: true })
   reviewedBy: Relation<User | null>;
+
+  /** Required when the request is cancelled; shown back to the requester. */
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  cancellationReason: string | null;
+
+  /** Who cancelled the request: the requester (while pending) or an admin. */
+  @ManyToOne(() => User, { nullable: true })
+  cancelledBy: Relation<User | null>;
 
   @Column({ type: 'jsonb', default: [] })
   timeline: TimelineEvent[];

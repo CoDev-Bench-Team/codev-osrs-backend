@@ -9,12 +9,14 @@ import {
   ParseIntPipe,
   Query,
   Req,
+  HttpCode,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request as ExpressRequest } from 'express';
 import { RequestsService } from './requests.service.js';
 import { CreateRequestDto } from './dto/create-request.dto.js';
 import { UpdateRequestDto } from './dto/update-request.dto.js';
+import { CancelRequestDto } from './dto/cancel-request.dto.js';
 import { PaginatedRequestsQueryDto } from './dto/paginated-requests-query.dto.js';
 import { ApiValidationProblemResponse } from '../common/api-validation-problem-response.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
@@ -85,6 +87,24 @@ export class RequestsController {
     // The global AuthGuard rejects unauthenticated requests before this
     // handler runs, so `request.user` is always populated here.
     return this.requestsService.update(id, updateRequestDto, request.user!);
+  }
+
+  @ApiOperation({
+    summary: 'Cancels a request, with a reason.',
+    description:
+      "An employee may cancel their own request while it is pending approval; an admin may cancel an approved, ready-for-pickup or for-delivery request that can't be fulfilled. The request's stock returns to Available and the requester is emailed. Any other status returns 409.",
+  })
+  @ApiValidationProblemResponse(CancelRequestDto)
+  @HttpCode(200)
+  @Post(':id/cancel')
+  cancel(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() cancelRequestDto: CancelRequestDto,
+    @Req() request: ExpressRequest,
+  ) {
+    // The global AuthGuard rejects unauthenticated requests before this
+    // handler runs, so `request.user` is always populated here.
+    return this.requestsService.cancel(id, cancelRequestDto, request.user!);
   }
 
   @ApiOperation({

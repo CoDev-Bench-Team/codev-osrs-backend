@@ -20,6 +20,7 @@ import {
 } from '../mailer/mailer.service.js';
 import { CreateRequestDto } from './dto/create-request.dto.js';
 import { UpdateRequestDto } from './dto/update-request.dto.js';
+import { CancelRequestDto } from './dto/cancel-request.dto.js';
 import {
   PaginatedRequestsQueryDto,
   RequestSortOrder,
@@ -29,6 +30,7 @@ import { PaginatedResult } from '../common/paginated-result.js';
 const RELATIONS = {
   requestor: true,
   reviewedBy: true,
+  cancelledBy: true,
   items: { asset: true },
 };
 
@@ -44,7 +46,20 @@ const LEGAL_TRANSITIONS: Record<RequestStatus, RequestStatus[]> = {
     RequestStatus.READY_FOR_PICKUP,
     RequestStatus.FOR_DELIVERY,
   ],
+  // Only through `cancel()`, which has its own per-role rules.
+  [RequestStatus.CANCELLED]: [],
 };
+
+/** Statuses an employee may cancel their own request from (FR-010a). */
+const EMPLOYEE_CANCELLABLE = [RequestStatus.PENDING_APPROVAL];
+
+/** Statuses an admin may cancel a request from (FR-010b) — after approval
+ * only; a pending request is rejected instead. */
+const ADMIN_CANCELLABLE = [
+  RequestStatus.APPROVED,
+  RequestStatus.READY_FOR_PICKUP,
+  RequestStatus.FOR_DELIVERY,
+];
 
 @Injectable()
 export class RequestsService {
@@ -344,34 +359,44 @@ export class RequestsService {
       return this.find(id);
     }
 
-    const allowedFrom = LEGAL_TRANSITIONS[status];
-    if (!allowedFrom.includes(request.status)) {
-      throw new ConflictException(
-        `A request with status '${request.status}' cannot be moved to '${status}'.`,
-      );
-    }
-
     const changedAt = new Date();
 
     await this.requestsRepository.manager.transaction(async (manager) => {
+      const currentStatus = await this.lockedStatus(manager, id);
+      if (!LEGAL_TRANSITIONS[status].includes(currentStatus)) {
+        throw new ConflictException(
+          `A request with status '${currentStatus}' cannot be moved to '${status}'.`,
+        );
+      }
+
       // The stock reserved at submit either goes out to the requester
       // (approve) or returns to the shelf (reject). Release and complete
       // leave it alone — it stays assigned. Assigned units keep their
       // request link as a record of which request issued them; returned
       // units drop it so a later request can claim them.
       if (status === RequestStatus.APPROVED) {
-        await this.moveReservedUnits(manager, request, {
-          status: InventoryItemStatus.ASSIGNED,
-          assignedTo: request.requestor,
-          assignedAt: changedAt,
-        });
+        await this.moveRequestUnits(
+          manager,
+          request,
+          [InventoryItemStatus.RESERVED],
+          {
+            status: InventoryItemStatus.ASSIGNED,
+            assignedTo: request.requestor,
+            assignedAt: changedAt,
+          },
+        );
       } else if (status === RequestStatus.REJECTED) {
-        await this.moveReservedUnits(manager, request, {
-          status: InventoryItemStatus.AVAILABLE,
-          assignedTo: null,
-          assignedAt: null,
-          request: null,
-        });
+        await this.moveRequestUnits(
+          manager,
+          request,
+          [InventoryItemStatus.RESERVED],
+          {
+            status: InventoryItemStatus.AVAILABLE,
+            assignedTo: null,
+            assignedAt: null,
+            request: null,
+          },
+        );
       }
 
       const isDecision =
@@ -411,13 +436,88 @@ export class RequestsService {
   }
 
   /**
-   * Moves the units this request reserved on submit (linked via
-   * `InventoryItem.request`, still `RESERVED`) into a new state. Locked in a
-   * stable id order so two concurrent decisions can't both move them.
+   * Cancels a request with a reason (FR-010a/b/c): the requester may cancel
+   * their own while it is pending approval; an admin may cancel one that has
+   * been approved but not completed. The claimed stock returns to Available
+   * in the same transaction as the status change.
    */
-  private async moveReservedUnits(
+  async cancel(
+    id: number,
+    cancelRequestDto: CancelRequestDto,
+    actor: User,
+  ): Promise<Request> {
+    // Scoped by `actor`, so an employee gets 404 for someone else's request.
+    const request = await this.find(id, actor);
+    const reason = cancelRequestDto.reason.trim();
+    const isAdmin = actor.role === UserRole.ADMIN;
+    const cancellable = isAdmin ? ADMIN_CANCELLABLE : EMPLOYEE_CANCELLABLE;
+    const changedAt = new Date();
+
+    await this.requestsRepository.manager.transaction(async (manager) => {
+      const currentStatus = await this.lockedStatus(manager, id);
+      if (!cancellable.includes(currentStatus)) {
+        throw new ConflictException(
+          isAdmin
+            ? `A request with status '${currentStatus}' cannot be cancelled by an admin; only approved requests not yet completed can be (reject a pending request instead).`
+            : `A request with status '${currentStatus}' cannot be cancelled; you can only cancel a request while it is pending approval.`,
+        );
+      }
+
+      // Reserved units (and units already assigned on approval) go back on
+      // the shelf, free for another request to claim.
+      await this.moveRequestUnits(
+        manager,
+        request,
+        [InventoryItemStatus.RESERVED, InventoryItemStatus.ASSIGNED],
+        {
+          status: InventoryItemStatus.AVAILABLE,
+          assignedTo: null,
+          assignedAt: null,
+          request: null,
+        },
+      );
+
+      await manager.save(Request, {
+        ...request,
+        status: RequestStatus.CANCELLED,
+        cancellationReason: reason,
+        cancelledBy: actor,
+        updatedBy: actor,
+        timeline: [
+          ...request.timeline,
+          {
+            status: RequestStatus.CANCELLED,
+            at: changedAt.toISOString(),
+            byUserId: actor.id,
+            note: reason,
+          },
+        ],
+      });
+    });
+
+    const cancelled = await this.find(id);
+
+    // Sent after the transaction commits, like every status email.
+    await this.sendStatusChangeEmail(
+      cancelled,
+      RequestStatus.CANCELLED,
+      changedAt,
+      reason,
+    );
+
+    return cancelled;
+  }
+
+  /**
+   * Moves the units this request claimed on submit (linked via
+   * `InventoryItem.request`) that are currently in one of `from` into a new
+   * state. Locked in a stable id order so two concurrent decisions can't
+   * both move them.
+   */
+  private async moveRequestUnits(
     manager: EntityManager,
     request: Request,
+    from: InventoryItemStatus[],
     changes: {
       status: InventoryItemStatus;
       assignedTo: User | null;
@@ -425,25 +525,43 @@ export class RequestsService {
       request?: null;
     },
   ): Promise<void> {
-    const reserved = await manager
+    const units = await manager
       .createQueryBuilder(InventoryItem, 'inventory')
       .setLock('pessimistic_write')
       .where('inventory.request_id = :requestId', { requestId: request.id })
-      .andWhere('inventory.status = :status', {
-        status: InventoryItemStatus.RESERVED,
-      })
+      .andWhere('inventory.status IN (:...from)', { from })
       .orderBy('inventory.id', 'ASC')
       .getMany();
 
-    if (!reserved.length) {
+    if (!units.length) {
       return;
     }
 
     await manager.update(
       InventoryItem,
-      reserved.map((unit) => unit.id),
+      units.map((unit) => unit.id),
       changes,
     );
+  }
+
+  /**
+   * Re-reads the request's status under a row lock, inside the transaction
+   * that will change it — so two concurrent status changes (an employee's
+   * cancel and an admin's approve, say) can't both pass their checks.
+   */
+  private async lockedStatus(
+    manager: EntityManager,
+    id: number,
+  ): Promise<RequestStatus> {
+    const locked = await manager.findOne(Request, {
+      where: { id },
+      select: { id: true, status: true },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!locked) {
+      throw new NotFoundException(`Request with ID '${id}' could not be found.`);
+    }
+    return locked.status;
   }
 
   /** Dispatches the email for whichever transition just happened. */
@@ -451,7 +569,7 @@ export class RequestsService {
     request: Request,
     status: RequestStatus,
     changedAt: Date,
-    rejectionReason?: string,
+    reason?: string,
   ): Promise<void> {
     const context: RequestEmailContext = {
       requestId: request.id,
@@ -475,7 +593,13 @@ export class RequestsService {
       case RequestStatus.REJECTED:
         return this.mailerService.sendRequestRejectedEmail(
           context,
-          rejectionReason ?? request.rejectionReason ?? '',
+          reason ?? request.rejectionReason ?? '',
+        );
+      case RequestStatus.CANCELLED:
+        return this.mailerService.sendRequestCancelledEmail(
+          context,
+          reason ?? request.cancellationReason ?? '',
+          request.cancelledBy?.id === request.requestor.id,
         );
       case RequestStatus.READY_FOR_PICKUP:
         return this.mailerService.sendRequestReadyForPickupEmail(context);
