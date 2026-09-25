@@ -12,6 +12,7 @@ import {
 import type { Relation } from 'typeorm';
 import { User } from '../../users/entities/user.entity.js';
 import { RequestAsset } from './request-asset.entity.js';
+import { AssetLocation } from '../../assets/entities/asset.entity.js';
 
 export enum RequestStatus {
   PENDING_APPROVAL = 'pending_approval',
@@ -50,6 +51,13 @@ export class Request {
     default: RequestStatus.PENDING_APPROVAL,
   })
   status: RequestStatus;
+
+  /**
+   * The office the request draws stock from: the requester's home office at
+   * submit time (FR-006), kept even if they later move offices.
+   */
+  @Column({ type: 'enum', enum: AssetLocation })
+  requestingOffice: AssetLocation;
 
   @Column({ type: 'varchar', length: 500, nullable: true })
   purpose: string | null;

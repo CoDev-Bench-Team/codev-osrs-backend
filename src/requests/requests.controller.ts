@@ -54,8 +54,11 @@ export class RequestsController {
 
   @ApiOperation({
     summary: 'Creates a new request using the supplied item details.',
+    description:
+      "Employee only. Stock is reserved at the employee's own office; another office's stock can't be requested.",
   })
   @ApiValidationProblemResponse(CreateRequestDto)
+  @Roles('employee')
   @Post()
   create(
     @Body() createRequestDto: CreateRequestDto,

@@ -9,7 +9,7 @@ import { EntityManager, In, Repository } from 'typeorm';
 import { Request, RequestStatus, TimelineEvent } from './entities/request.entity.js';
 import { RequestAsset } from './entities/request-asset.entity.js';
 import { User, UserRole } from '../users/entities/user.entity.js';
-import { Asset } from '../assets/entities/asset.entity.js';
+import { Asset, AssetLocation } from '../assets/entities/asset.entity.js';
 import {
   InventoryItem,
   InventoryItemStatus,
@@ -199,6 +199,18 @@ export class RequestsService {
       );
     }
 
+    // Stock is held per office, and an employee requests from their own
+    // office only (FR-006; the MVP doesn't request another office's stock).
+    // A home office outside the known offices fails closed.
+    const office = Object.values(AssetLocation).find(
+      (location) => location === String(requestor.location),
+    );
+    if (!office) {
+      throw new BadRequestException(
+        `Your account's office ('${requestor.location}') isn't one we hold stock at; ask an admin to update it.`,
+      );
+    }
+
     // Validates every line, reserves stock, and creates the request (plus
     // its RequestAsset lines, via cascade) in one atomic transaction: either
     // all lines succeed and stock is decremented for each, or nothing is
@@ -221,6 +233,7 @@ export class RequestsService {
             .createQueryBuilder(InventoryItem, 'inventory')
             .setLock('pessimistic_write')
             .where('inventory.asset_id = :assetId', { assetId: asset.id })
+            .andWhere('inventory.location = :office', { office })
             .andWhere('inventory.status = :status', {
               status: InventoryItemStatus.AVAILABLE,
             })
@@ -230,7 +243,7 @@ export class RequestsService {
 
           if (availableUnits.length < line.quantity) {
             throw new BadRequestException(
-              `Insufficient stock for '${asset.name}': requested ${line.quantity}, ${availableUnits.length} available.`,
+              `Insufficient stock for '${asset.name}' at ${office}: requested ${line.quantity}, ${availableUnits.length} available.`,
             );
           }
 
@@ -252,6 +265,7 @@ export class RequestsService {
           purpose: createRequestDto.purpose,
           items: requestItems,
           requestor,
+          requestingOffice: office,
           createdBy: requestor,
           timeline: [initialEvent],
           displayId: 'PENDING', // replaced with a real ID once the row has one
@@ -298,7 +312,7 @@ export class RequestsService {
       })),
       requesterFirstName: requestor.firstName,
       requesterFullName: `${requestor.firstName} ${requestor.lastName}`.trim(),
-      requesterOffice: requestor.location,
+      requesterOffice: request.requestingOffice,
       requesterEmail: requestor.email,
     };
 
@@ -451,7 +465,7 @@ export class RequestsService {
       requesterFirstName: request.requestor.firstName,
       requesterFullName:
         `${request.requestor.firstName} ${request.requestor.lastName}`.trim(),
-      requesterOffice: request.requestor.location,
+      requesterOffice: request.requestingOffice,
       requesterEmail: request.requestor.email,
     };
 
@@ -486,11 +500,11 @@ export class RequestsService {
   }
 
   /**
-   * Attaches each item's current available stock (same counting logic as
-  * `AssetsService.attachQuantities()`: `InventoryItem` rows with status
-   * `AVAILABLE`, grouped by asset) — per PR #79 review, so an admin view can
-   * show live stock alongside a request's line items without a second
-   * round-trip.
+   * Attaches each item's current available stock at the request's office
+   * (same counting logic as `AssetsService.attachQuantities()`:
+   * `InventoryItem` rows with status `AVAILABLE`) — per PR #79 review, so an
+   * admin view can show live stock alongside a request's line items without
+   * a second round-trip.
    */
   private async attachAvailableStock(requests: Request[]): Promise<Request[]> {
     const assetIds = [
@@ -503,22 +517,29 @@ export class RequestsService {
     const counts = await this.requestsRepository.manager
       .createQueryBuilder(InventoryItem, 'inventory')
       .select('inventory.asset_id', 'assetId')
+      .addSelect('inventory.location', 'office')
       .addSelect('COUNT(inventory.id)', 'count')
       .where('inventory.asset_id IN (:...assetIds)', { assetIds })
       .andWhere('inventory.status = :status', {
         status: InventoryItemStatus.AVAILABLE,
       })
       .groupBy('inventory.asset_id')
-      .getRawMany<{ assetId: number; count: string }>();
+      .addGroupBy('inventory.location')
+      .getRawMany<{ assetId: number; office: string; count: string }>();
 
-    const stockByAssetId = new Map(
-      counts.map(({ assetId, count }) => [assetId, Number(count)]),
+    const stockKey = (assetId: number, office: string) => `${assetId}@${office}`;
+    const stock = new Map(
+      counts.map(({ assetId, office, count }) => [
+        stockKey(assetId, office),
+        Number(count),
+      ]),
     );
 
     for (const request of requests) {
       for (const item of request.items) {
         Object.assign(item, {
-          availableStock: stockByAssetId.get(item.asset.id) ?? 0,
+          availableStock:
+            stock.get(stockKey(item.asset.id, request.requestingOffice)) ?? 0,
         });
       }
     }
