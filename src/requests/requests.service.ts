@@ -369,12 +369,13 @@ export class RequestsService {
         );
       }
 
-      // The stock reserved at submit either goes out to the requester
-      // (approve) or returns to the shelf (reject). Release and complete
-      // leave it alone — it stays assigned. Assigned units keep their
-      // request link as a record of which request issued them; returned
-      // units drop it so a later request can claim them.
-      if (status === RequestStatus.APPROVED) {
+      // Stock reserved at submit stays reserved through approval and
+      // handover (ADR-0006, FR-008/011), and leaves the store only when the
+      // request is completed (FR-012): the units are then assigned to the
+      // requester. A rejection returns them to the shelf. Assigned units
+      // keep their request link as a record of which request issued them;
+      // returned units drop it so a later request can claim them.
+      if (status === RequestStatus.COMPLETED) {
         await this.moveRequestUnits(
           manager,
           request,
@@ -463,8 +464,9 @@ export class RequestsService {
         );
       }
 
-      // Reserved units (and units already assigned on approval) go back on
-      // the shelf, free for another request to claim.
+      // The reserved units go back on the shelf, free for another request to
+      // claim. Assigned is included for requests approved before stock
+      // moved to completion, whose units were assigned on approval.
       await this.moveRequestUnits(
         manager,
         request,

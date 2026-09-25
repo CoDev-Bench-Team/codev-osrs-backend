@@ -74,7 +74,7 @@ export class RequestsController {
   @ApiOperation({
     summary: 'Updates an existing request, including the review flow.',
     description:
-      'Drives approve, reject (with a reason), release (ready_for_pickup or for_delivery) and complete. Illegal status transitions are refused with a 409.',
+      'Drives approve, reject (with a reason), release (ready_for_pickup or for_delivery) and complete. Stock stays reserved until the request is completed, when its units are assigned to the requester; a rejection returns them to Available. Illegal status transitions are refused with a 409.',
   })
   @ApiValidationProblemResponse(UpdateRequestDto)
   @Roles('admin')

@@ -229,7 +229,7 @@ export class MailerService {
             pillBackground: '#f1ebfb',
             pillColor: '#6b3fc4',
             title: 'Your request is complete',
-            body: `Thanks, ${context.requesterFirstName} — you've confirmed your items were received, so this request is now closed. Need anything else? Just submit a new request.`,
+            body: `Hi ${context.requesterFirstName} — your items have been handed over and assigned to you, so this request is now closed. Need anything else? Just submit a new request.`,
             dateLine: `Completed ${formatSubmittedAt(context.submittedAt)}`,
             showItems: true,
             ctaLabel: 'View request',
