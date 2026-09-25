@@ -252,7 +252,7 @@ export class MailerService {
             pillBackground: '#f1ebfb',
             pillColor: '#6b3fc4',
             title: 'Your request is complete',
-            body: `Hi ${context.requesterFirstName} — your items have been handed over and assigned to you, so this request is now closed. Need anything else? Just submit a new request.`,
+            body: `Hi ${context.requesterFirstName} — Admin changed the status of your request from ${statusLabel(context.previousStatus, 'For Delivery')} to Completed. Your items have been handed over and assigned to you, so this request is now closed. Need anything else? Just submit a new request.`,
             dateLine: `Completed ${formatSubmittedAt(context.submittedAt)}`,
             showItems: true,
             ctaLabel: 'View request',
@@ -273,8 +273,8 @@ export class MailerService {
             pillColor: '#5b6270',
             title: 'Your request was cancelled',
             body: cancelledByRequester
-                ? `Hi ${context.requesterFirstName} — you cancelled this request, and the items it held have been released. Your reason:`
-                : `Hi ${context.requesterFirstName} — Admin cancelled your request because it can't be fulfilled. Here's why:`,
+                ? `Hi ${context.requesterFirstName} — you cancelled this request (it was ${statusLabel(context.previousStatus, 'Pending Approval')}), and the items it held have been released. Your reason:`
+                : `Hi ${context.requesterFirstName} — Admin changed the status of your request from ${statusLabel(context.previousStatus, 'Approved')} to Cancelled because it can't be fulfilled. Here's why:`,
             reason,
             ctaLabel: 'Submit a new request',
             ctaUrl: `${process.env.PORTAL_URL}/requests`,

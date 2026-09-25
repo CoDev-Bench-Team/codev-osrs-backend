@@ -590,9 +590,11 @@ export class RequestsService {
     const isAdmin = actor.role === UserRole.ADMIN;
     const cancellable = isAdmin ? ADMIN_CANCELLABLE : EMPLOYEE_CANCELLABLE;
     const changedAt = new Date();
+    let previousStatus = request.status;
 
     await this.requestsRepository.manager.transaction(async (manager) => {
       const currentStatus = await this.lockedStatus(manager, id);
+      previousStatus = currentStatus;
       if (!cancellable.includes(currentStatus)) {
         throw new ConflictException(
           isAdmin
@@ -643,6 +645,7 @@ export class RequestsService {
       RequestStatus.CANCELLED,
       changedAt,
       reason,
+      previousStatus,
     );
 
     return cancelled;
