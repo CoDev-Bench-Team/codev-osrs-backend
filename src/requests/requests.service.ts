@@ -1,6 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { Request, RequestStatus, TimelineEvent } from './entities/request.entity.js';
 import { RequestAsset } from './entities/request-asset.entity.js';
 import { User, UserRole } from '../users/entities/user.entity.js';
@@ -11,7 +16,7 @@ import {
 } from '../inventory-items/entities/inventory-item.entity.js';
 import {
   MailerService,
-  NewRequestEmailContext,
+  RequestEmailContext,
 } from '../mailer/mailer.service.js';
 import { CreateRequestDto } from './dto/create-request.dto.js';
 import { UpdateRequestDto } from './dto/update-request.dto.js';
@@ -23,8 +28,22 @@ import { PaginatedResult } from '../common/paginated-result.js';
 
 const RELATIONS = {
   requestor: true,
-  approvedBy: true,
+  reviewedBy: true,
   items: { asset: true },
+};
+
+/** Which statuses a request may be moved *from* for each target status
+ * (BEN-110). Anything else is rejected as an illegal transition. */
+const LEGAL_TRANSITIONS: Record<RequestStatus, RequestStatus[]> = {
+  [RequestStatus.PENDING_APPROVAL]: [],
+  [RequestStatus.APPROVED]: [RequestStatus.PENDING_APPROVAL],
+  [RequestStatus.REJECTED]: [RequestStatus.PENDING_APPROVAL],
+  [RequestStatus.READY_FOR_PICKUP]: [RequestStatus.APPROVED],
+  [RequestStatus.FOR_DELIVERY]: [RequestStatus.APPROVED],
+  [RequestStatus.COMPLETED]: [
+    RequestStatus.READY_FOR_PICKUP,
+    RequestStatus.FOR_DELIVERY,
+  ],
 };
 
 @Injectable()
@@ -171,6 +190,7 @@ export class RequestsService {
     const savedRequest = await this.requestsRepository.manager.transaction(
       async (manager) => {
         const requestItems: RequestAsset[] = [];
+        const reservedUnitIds: number[] = [];
 
         for (const line of createRequestDto.items) {
           const asset = await manager.findOneBy(Asset, { id: line.assetId });
@@ -196,11 +216,8 @@ export class RequestsService {
             );
           }
 
-          await manager.update(
-            InventoryItem,
-            availableUnits.map((unit) => unit.id),
-            { status: InventoryItemStatus.RESERVED },
-          );
+          // Reserved below, once the request row exists to link them to.
+          reservedUnitIds.push(...availableUnits.map((unit) => unit.id));
 
           requestItems.push(
             manager.create(RequestAsset, { asset, quantity: line.quantity }),
@@ -226,6 +243,13 @@ export class RequestsService {
         const inserted = await manager.save(newRequest);
         inserted.displayId = `REQ-${inserted.createdAt.getFullYear()}-${inserted.id}`;
 
+        // Still locked from the reads above. Recording the request on each
+        // unit lets approve/reject move exactly these units later.
+        await manager.update(InventoryItem, reservedUnitIds, {
+          status: InventoryItemStatus.RESERVED,
+          request: { id: inserted.id },
+        });
+
         return manager.save(inserted);
       },
     );
@@ -245,7 +269,7 @@ export class RequestsService {
     request: Request,
     requestor: User,
   ): Promise<void> {
-    const context: NewRequestEmailContext = {
+    const context: RequestEmailContext = {
       requestId: request.id,
       displayId: request.displayId,
       submittedAt: request.createdAt,
@@ -277,20 +301,159 @@ export class RequestsService {
   async update(
     id: number,
     updateRequestDto: UpdateRequestDto,
+    actor: User,
   ): Promise<Request> {
-    const requestToUpdate = await this.requestsRepository.findOneBy({ id });
-    if (!requestToUpdate) {
-      throw new NotFoundException(
-        `Request with ID '${id}' could not be found.`,
+    const request = await this.find(id);
+    const { status, rejectionReason, ...fields } = updateRequestDto;
+
+    if (!status) {
+      // No status change — a plain field edit (e.g. the purpose).
+      await this.requestsRepository.save({ ...request, ...fields });
+      return this.find(id);
+    }
+
+    const allowedFrom = LEGAL_TRANSITIONS[status];
+    if (!allowedFrom.includes(request.status)) {
+      throw new ConflictException(
+        `A request with status '${request.status}' cannot be moved to '${status}'.`,
       );
     }
 
-    await this.requestsRepository.save({
-      ...requestToUpdate,
-      ...updateRequestDto,
+    const changedAt = new Date();
+
+    await this.requestsRepository.manager.transaction(async (manager) => {
+      // The stock reserved at submit either goes out to the requester
+      // (approve) or returns to the shelf (reject). Release and complete
+      // leave it alone — it stays assigned. Assigned units keep their
+      // request link as a record of which request issued them; returned
+      // units drop it so a later request can claim them.
+      if (status === RequestStatus.APPROVED) {
+        await this.moveReservedUnits(manager, request, {
+          status: InventoryItemStatus.ASSIGNED,
+          assignedTo: request.requestor,
+          assignedAt: changedAt,
+        });
+      } else if (status === RequestStatus.REJECTED) {
+        await this.moveReservedUnits(manager, request, {
+          status: InventoryItemStatus.AVAILABLE,
+          assignedTo: null,
+          assignedAt: null,
+          request: null,
+        });
+      }
+
+      const isDecision =
+        status === RequestStatus.APPROVED || status === RequestStatus.REJECTED;
+
+      await manager.save(Request, {
+        ...request,
+        ...fields,
+        status,
+        rejectionReason:
+          status === RequestStatus.REJECTED
+            ? (rejectionReason ?? null)
+            : request.rejectionReason,
+        reviewedBy: isDecision ? actor : request.reviewedBy,
+        updatedBy: actor,
+        timeline: [
+          ...request.timeline,
+          {
+            status,
+            at: changedAt.toISOString(),
+            byUserId: actor.id,
+            ...(status === RequestStatus.REJECTED && rejectionReason
+              ? { note: rejectionReason }
+              : {}),
+          },
+        ],
+      });
     });
 
-    return this.find(id);
+    const updated = await this.find(id);
+
+    // Sent after the transaction commits — a delivery failure must not roll
+    // back an already-valid status change.
+    await this.sendStatusChangeEmail(updated, status, changedAt, rejectionReason);
+
+    return updated;
+  }
+
+  /**
+   * Moves the units this request reserved on submit (linked via
+   * `InventoryItem.request`, still `RESERVED`) into a new state. Locked in a
+   * stable id order so two concurrent decisions can't both move them.
+   */
+  private async moveReservedUnits(
+    manager: EntityManager,
+    request: Request,
+    changes: {
+      status: InventoryItemStatus;
+      assignedTo: User | null;
+      assignedAt: Date | null;
+      request?: null;
+    },
+  ): Promise<void> {
+    const reserved = await manager
+      .createQueryBuilder(InventoryItem, 'inventory')
+      .setLock('pessimistic_write')
+      .where('inventory.request_id = :requestId', { requestId: request.id })
+      .andWhere('inventory.status = :status', {
+        status: InventoryItemStatus.RESERVED,
+      })
+      .orderBy('inventory.id', 'ASC')
+      .getMany();
+
+    if (!reserved.length) {
+      return;
+    }
+
+    await manager.update(
+      InventoryItem,
+      reserved.map((unit) => unit.id),
+      changes,
+    );
+  }
+
+  /** Dispatches the email for whichever transition just happened. */
+  private async sendStatusChangeEmail(
+    request: Request,
+    status: RequestStatus,
+    changedAt: Date,
+    rejectionReason?: string,
+  ): Promise<void> {
+    const context: RequestEmailContext = {
+      requestId: request.id,
+      displayId: request.displayId,
+      submittedAt: changedAt,
+      purpose: request.purpose,
+      items: request.items.map((item) => ({
+        itemName: item.asset.name,
+        quantity: item.quantity,
+      })),
+      requesterFirstName: request.requestor.firstName,
+      requesterFullName:
+        `${request.requestor.firstName} ${request.requestor.lastName}`.trim(),
+      requesterOffice: request.requestor.location,
+      requesterEmail: request.requestor.email,
+    };
+
+    switch (status) {
+      case RequestStatus.APPROVED:
+        return this.mailerService.sendRequestApprovedEmail(context);
+      case RequestStatus.REJECTED:
+        return this.mailerService.sendRequestRejectedEmail(
+          context,
+          rejectionReason ?? request.rejectionReason ?? '',
+        );
+      case RequestStatus.READY_FOR_PICKUP:
+        return this.mailerService.sendRequestReadyForPickupEmail(context);
+      case RequestStatus.FOR_DELIVERY:
+        return this.mailerService.sendRequestForDeliveryEmail(context);
+      case RequestStatus.COMPLETED:
+        return this.mailerService.sendRequestCompletedEmail(context);
+      default:
+        return;
+    }
   }
 
   async delete(id: number): Promise<Request> {

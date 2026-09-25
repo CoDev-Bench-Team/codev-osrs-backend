@@ -11,6 +11,7 @@ import {
 import type { Relation } from 'typeorm';
 import { User } from '../../users/entities/user.entity.js';
 import { Asset, AssetLocation } from '../../assets/entities/asset.entity.js';
+import { Request } from '../../requests/entities/request.entity.js';
 
 export enum InventoryItemStatus {
 	AVAILABLE = 'Available',
@@ -32,6 +33,15 @@ export class InventoryItem {
 
 	@ManyToOne(() => Asset)
 	asset: Relation<Asset>;
+
+	/**
+	 * The request that reserved this unit on submit. Lets approve/reject move
+	 * exactly the units that request claimed, not just any reserved unit of
+	 * the same asset. Cleared when a rejection returns the unit to stock.
+	 */
+	@Index()
+	@ManyToOne(() => Request, { nullable: true, onDelete: 'SET NULL' })
+	request: Relation<Request | null>;
 
 	@Column({ type: 'varchar', length: 255, nullable: true })
 	serialNumber: string | null;

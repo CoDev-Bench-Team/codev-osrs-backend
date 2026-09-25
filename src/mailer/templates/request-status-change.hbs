@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Your request is in</title>
+        <title>{{title}}</title>
         <style>
             body {
                 margin: 0;
@@ -50,19 +50,33 @@
                                                 <tr>
                                                     <td style="color: #2d3035; font-size: 17px; font-weight: bold;">{{displayId}}</td>
                                                     <td align="right">
-                                                        <span style="display: inline-block; padding: 6px 14px; border-radius: 999px; background-color: #fdf1de; color: #b0761a; font-size: 12px; font-weight: bold;">Pending Approval</span>
+                                                        <span style="display: inline-block; padding: 6px 14px; border-radius: 999px; background-color: {{pillBackground}}; color: {{pillColor}}; font-size: 12px; font-weight: bold;">{{pillLabel}}</span>
                                                     </td>
                                                 </tr>
                                             </table>
 
-                                            <h1 class="title" style="margin: 22px 0 14px; color: #1a1d21; font-size: 34px; line-height: 1.15;">Your request is in.</h1>
+                                            <h1 class="title" style="margin: 22px 0 14px; color: #1a1d21; font-size: 34px; line-height: 1.15;">{{title}}</h1>
 
                                             <p style="margin: 0 0 22px; color: #6d727b; font-size: 15px; line-height: 1.6;">
-                                                Hi {{firstName}} &mdash; we&rsquo;ve received your request and it&rsquo;s now waiting for your approver to take a look. You&rsquo;ll get another email as soon as its status changes.
+                                                {{body}}{{#if office}} Pickup is at <strong style="color: #2d3035;">{{office}}</strong> office.{{/if}}
                                             </p>
 
-                                            <p style="margin: 0 0 24px; color: #8b9098; font-size: 13px;">Submitted {{submittedAt}}</p>
+                                            {{#if reason}}
+                                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 4px;">
+                                                <tr>
+                                                    <td style="padding: 20px 22px; border: 1px solid #f0b6c0; border-radius: 8px; background-color: #fdf2f4;">
+                                                        <div style="margin-bottom: 8px; color: #cc2f4a; font-size: 14px; font-weight: bold;">Reason for rejection</div>
+                                                        <div style="color: #cc2f4a; font-size: 14px; line-height: 1.5;">{{reason}}</div>
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                            {{/if}}
 
+                                            {{#if dateLine}}
+                                            <p style="margin: 0 0 24px; color: #8b9098; font-size: 13px;">{{dateLine}}</p>
+                                            {{/if}}
+
+                                            {{#if items}}
                                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse; border-radius: 8px; overflow: hidden;">
                                                 <tr>
                                                     <td style="padding: 12px 18px; background-color: #f3f5f8; color: #8b9098; font-size: 11px; font-weight: bold; letter-spacing: 0.8px;">ITEM</td>
@@ -75,6 +89,7 @@
                                                 </tr>
                                                 {{/each}}
                                             </table>
+                                            {{/if}}
 
                                             {{#if purpose}}
                                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 22px;">
@@ -87,7 +102,7 @@
                                             </table>
                                             {{/if}}
 
-                                            <a href="{{viewUrl}}" style="display: inline-block; margin-top: 26px; padding: 14px 28px; border-radius: 6px; background-color: #cc2f4a; color: #ffffff; font-size: 15px; font-weight: bold; text-decoration: none;">View request</a>
+                                            <a href="{{ctaUrl}}" style="display: inline-block; margin-top: 26px; padding: 14px 28px; border-radius: 6px; background-color: #cc2f4a; color: #ffffff; font-size: 15px; font-weight: bold; text-decoration: none;">{{ctaLabel}}</a>
 
                                         </td>
                                     </tr>

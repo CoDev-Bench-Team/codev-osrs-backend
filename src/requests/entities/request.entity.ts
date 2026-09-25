@@ -54,8 +54,13 @@ export class Request {
   @Column({ type: 'varchar', length: 500, nullable: true })
   purpose: string | null;
 
+  /** Required when the request is rejected; shown back to the requester. */
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  rejectionReason: string | null;
+
+  /** The admin who approved or rejected the request. */
   @ManyToOne(() => User, { nullable: true })
-  approvedBy: Relation<User | null>;
+  reviewedBy: Relation<User | null>;
 
   @Column({ type: 'jsonb', default: [] })
   timeline: TimelineEvent[];
