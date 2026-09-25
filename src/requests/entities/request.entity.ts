@@ -71,6 +71,12 @@ export class Request {
   @ManyToOne(() => User, { nullable: true })
   reviewedBy: Relation<User | null>;
 
+  /** When the request reached Completed, Rejected or Cancelled — the date
+   * the History page shows and sorts by (FR-016a). */
+  @Index()
+  @Column({ type: 'timestamp', nullable: true })
+  resolvedAt: Date | null;
+
   /** Where the requester collects the items (e.g. "6th floor IT desk").
    * Set when the request is marked ready for pickup (FR-011a). */
   @Column({ type: 'varchar', length: 255, nullable: true })

@@ -25,6 +25,10 @@ import {
   PaginatedRequestsQueryDto,
   RequestSortOrder,
 } from './dto/paginated-requests-query.dto.js';
+import {
+  PaginatedRequestHistoryQueryDto,
+  RESOLVED_STATUSES,
+} from './dto/paginated-request-history-query.dto.js';
 import { PaginatedResult } from '../common/paginated-result.js';
 
 const RELATIONS = {
@@ -84,9 +88,39 @@ export class RequestsService {
    * Lists requests for the Admin's Requests Queue, or — when `viewer` is an
    * employee — only that employee's own requests (My Requests, FR-016).
    */
-  async paginate(
+  paginate(
     query: PaginatedRequestsQueryDto,
     viewer: User,
+  ): Promise<PaginatedResult<Request>> {
+    return this.paginateRequests(query, viewer, { dateColumn: 'createdAt' });
+  }
+
+  /**
+   * Lists resolved requests — completed, rejected or cancelled — for the
+   * admin History (FR-016a), newest resolution first by default.
+   */
+  history(
+    query: PaginatedRequestHistoryQueryDto,
+    viewer: User,
+  ): Promise<PaginatedResult<Request>> {
+    return this.paginateRequests(query, viewer, {
+      statuses: [...RESOLVED_STATUSES],
+      dateColumn: 'resolvedAt',
+    });
+  }
+
+  /**
+   * Shared by the queue and History: `scope.statuses` limits which statuses
+   * can appear at all, and `scope.dateColumn` is what the newest / oldest
+   * sorts order by.
+   */
+  private async paginateRequests(
+    query: PaginatedRequestsQueryDto,
+    viewer: User,
+    scope: {
+      statuses?: RequestStatus[];
+      dateColumn: 'createdAt' | 'resolvedAt';
+    },
   ): Promise<PaginatedResult<Request>> {
     const {
       page = 1,
@@ -115,6 +149,11 @@ export class RequestsService {
 
       if (viewer.role !== UserRole.ADMIN) {
         filtered.andWhere('requestor.id = :viewerId', { viewerId: viewer.id });
+      }
+      if (scope.statuses) {
+        filtered.andWhere('request.status IN (:...scopeStatuses)', {
+          scopeStatuses: scope.statuses,
+        });
       }
       if (status) {
         filtered.andWhere('request.status = :status', { status });
@@ -153,10 +192,14 @@ export class RequestsService {
         .orderBy('requestor.firstName', 'ASC')
         .addOrderBy('requestor.lastName', 'ASC');
     } else {
-      idQuery.orderBy(
-        'request.createdAt',
-        sort === RequestSortOrder.OLDEST ? 'ASC' : 'DESC',
-      );
+      idQuery
+        .orderBy(
+          `request.${scope.dateColumn}`,
+          sort === RequestSortOrder.OLDEST ? 'ASC' : 'DESC',
+        )
+        // Ties (and History rows resolved in the same instant) stay in a
+        // stable order across pages.
+        .addOrderBy('request.id', sort === RequestSortOrder.OLDEST ? 'ASC' : 'DESC');
     }
     idQuery.skip((page - 1) * limit).take(limit);
 
@@ -443,6 +486,11 @@ export class RequestsService {
               ? null
               : request.pickupLocation,
         reviewedBy: isDecision ? actor : request.reviewedBy,
+        resolvedAt: (RESOLVED_STATUSES as readonly RequestStatus[]).includes(
+          status,
+        )
+          ? changedAt
+          : request.resolvedAt,
         updatedBy: actor,
         timeline: [
           ...request.timeline,
@@ -524,6 +572,7 @@ export class RequestsService {
         status: RequestStatus.CANCELLED,
         cancellationReason: reason,
         cancelledBy: actor,
+        resolvedAt: changedAt,
         updatedBy: actor,
         timeline: [
           ...request.timeline,

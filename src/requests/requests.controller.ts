@@ -18,6 +18,7 @@ import { CreateRequestDto } from './dto/create-request.dto.js';
 import { UpdateRequestDto } from './dto/update-request.dto.js';
 import { CancelRequestDto } from './dto/cancel-request.dto.js';
 import { PaginatedRequestsQueryDto } from './dto/paginated-requests-query.dto.js';
+import { PaginatedRequestHistoryQueryDto } from './dto/paginated-request-history-query.dto.js';
 import { ApiValidationProblemResponse } from '../common/api-validation-problem-response.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 
@@ -42,6 +43,21 @@ export class RequestsController {
       paginatedRequestsQueryDto,
       request.user!,
     );
+  }
+
+  // Declared before `:id` so "history" isn't parsed as a request ID.
+  @ApiOperation({
+    summary: 'Retrieves the History: resolved requests, admin only.',
+    description:
+      'Completed, rejected and cancelled requests across all requesters (FR-016a), with resolvedAt and the stored rejectionReason / cancellationReason. Same search, filters and paging as the list; newest / oldest sort by resolution date.',
+  })
+  @Roles('admin')
+  @Get('history')
+  history(
+    @Query() historyQueryDto: PaginatedRequestHistoryQueryDto,
+    @Req() request: ExpressRequest,
+  ) {
+    return this.requestsService.history(historyQueryDto, request.user!);
   }
 
   @ApiOperation({
