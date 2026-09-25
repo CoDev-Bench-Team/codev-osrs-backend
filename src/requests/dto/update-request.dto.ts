@@ -5,6 +5,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   ValidateIf,
 } from 'class-validator';
@@ -48,4 +49,19 @@ export class UpdateRequestDto extends PartialType(
   @IsString()
   @MaxLength(500)
   rejectionReason?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Where the requester collects the items. Required when status is "ready_for_pickup", and only accepted then.',
+    example: '6th floor IT desk',
+  })
+  @ValidateIf(
+    (dto: UpdateRequestDto) => dto.status === RequestStatus.READY_FOR_PICKUP,
+  )
+  @IsString()
+  @Matches(/\S/, {
+    message: 'pickupLocation is required when marking a request ready for pickup.',
+  })
+  @MaxLength(255)
+  pickupLocation?: string;
 }

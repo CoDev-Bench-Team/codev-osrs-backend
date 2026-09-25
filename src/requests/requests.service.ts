@@ -351,7 +351,17 @@ export class RequestsService {
     actor: User,
   ): Promise<Request> {
     const request = await this.find(id);
-    const { status, rejectionReason, ...fields } = updateRequestDto;
+    const { status, rejectionReason, pickupLocation, ...fields } =
+      updateRequestDto;
+
+    if (
+      pickupLocation !== undefined &&
+      status !== RequestStatus.READY_FOR_PICKUP
+    ) {
+      throw new BadRequestException(
+        'pickupLocation can only be set when marking a request ready_for_pickup.',
+      );
+    }
 
     if (!status) {
       // No status change — a plain field edit (e.g. the purpose).
@@ -411,6 +421,14 @@ export class RequestsService {
           status === RequestStatus.REJECTED
             ? (rejectionReason ?? null)
             : request.rejectionReason,
+        // Recorded for pickup (FR-011a); cleared if the request moves to
+        // delivery instead, so a stale location is never shown.
+        pickupLocation:
+          status === RequestStatus.READY_FOR_PICKUP
+            ? (pickupLocation?.trim() ?? null)
+            : status === RequestStatus.FOR_DELIVERY
+              ? null
+              : request.pickupLocation,
         reviewedBy: isDecision ? actor : request.reviewedBy,
         updatedBy: actor,
         timeline: [
@@ -421,6 +439,9 @@ export class RequestsService {
             byUserId: actor.id,
             ...(status === RequestStatus.REJECTED && rejectionReason
               ? { note: rejectionReason }
+              : {}),
+            ...(status === RequestStatus.READY_FOR_PICKUP && pickupLocation
+              ? { note: `Pickup: ${pickupLocation.trim()}` }
               : {}),
           },
         ],
@@ -586,6 +607,7 @@ export class RequestsService {
       requesterFullName:
         `${request.requestor.firstName} ${request.requestor.lastName}`.trim(),
       requesterOffice: request.requestingOffice,
+      pickupLocation: request.pickupLocation,
       requesterEmail: request.requestor.email,
     };
 

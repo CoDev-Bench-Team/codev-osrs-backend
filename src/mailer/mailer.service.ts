@@ -69,6 +69,8 @@ export interface RequestEmailContext {
     requesterFullName: string;
     requesterOffice: string;
     requesterEmail: string;
+    /** Only for status emails, once the request is ready for pickup. */
+    pickupLocation?: string | null;
 }
 
 @Injectable()
@@ -193,7 +195,9 @@ export class MailerService {
             pillColor: '#1d4ed8',
             title: 'Your request is ready for pickup',
             body: `Hi ${context.requesterFirstName} — Admin changed the status of your request from Approved to Ready for pickup.`,
-            office: context.requesterOffice,
+            pickup: context.pickupLocation
+                ? `${context.pickupLocation}, ${context.requesterOffice} office`
+                : `${context.requesterOffice} office`,
             dateLine: `Ready for Pickup ${formatSubmittedAt(context.submittedAt)}`,
             showItems: true,
             ctaLabel: 'View request',
@@ -267,7 +271,7 @@ export class MailerService {
             pillColor: string;
             title: string;
             body: string;
-            office?: string;
+            pickup?: string;
             reason?: string;
             dateLine?: string;
             showItems?: boolean;
@@ -288,7 +292,7 @@ export class MailerService {
                 pillColor: variant.pillColor,
                 title: variant.title,
                 body: variant.body,
-                office: variant.office,
+                pickup: variant.pickup,
                 reason: variant.reason,
                 dateLine: variant.dateLine,
                 items: variant.showItems ? context.items : null,

@@ -71,6 +71,11 @@ export class Request {
   @ManyToOne(() => User, { nullable: true })
   reviewedBy: Relation<User | null>;
 
+  /** Where the requester collects the items (e.g. "6th floor IT desk").
+   * Set when the request is marked ready for pickup (FR-011a). */
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  pickupLocation: string | null;
+
   /** Required when the request is cancelled; shown back to the requester. */
   @Column({ type: 'varchar', length: 500, nullable: true })
   cancellationReason: string | null;
