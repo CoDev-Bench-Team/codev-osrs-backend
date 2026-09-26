@@ -4,7 +4,6 @@ import { AssetsService } from './assets.service.js';
 import { CreateAssetDto } from './dto/create-asset.dto.js';
 import { UpdateAssetDto } from './dto/update-asset.dto.js';
 import { PaginatedAssetsQueryDto } from './dto/paginated-assets-query.dto.js';
-import { Public } from '../auth/public.decorator.js';
 import { ApiValidationProblemResponse } from '../common/api-validation-problem-response.decorator.js';
 
 @ApiTags('Assets')
