@@ -31,7 +31,6 @@ export class AssetsController {
   })
   @ApiValidationProblemResponse(CreateAssetDto)
   @Post()
-  @Public()
   create(@Body() createAssetDto: CreateAssetDto) {
     return this.assetsService.create(createAssetDto);
   }
