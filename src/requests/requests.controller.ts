@@ -11,7 +11,14 @@ import {
   Req,
   HttpCode,
 } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiCookieAuth,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { Request as ExpressRequest } from 'express';
 import { RequestsService } from './requests.service.js';
 import { CreateRequestDto } from './dto/create-request.dto.js';
@@ -24,10 +31,32 @@ import {
   RequestCounts,
   RequestCountsQueryDto,
 } from './dto/request-counts.dto.js';
+import {
+  PaginatedRequestsResponseDto,
+  RequestResponseDto,
+} from './dto/request-response.dto.js';
 import { ApiValidationProblemResponse } from '../common/api-validation-problem-response.decorator.js';
+import { ApiProblemResponse } from '../common/api-problem-response.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 
+const ApiRequestIdParam = () =>
+  ApiParam({
+    name: 'id',
+    description: 'The numeric request identifier (not the REQ-… display ID).',
+    type: Number,
+  });
+
+const ApiUnauthorizedProblem = () =>
+  ApiProblemResponse(401, 'No valid session cookie.', 'Unauthorized');
+
+const ApiForbiddenProblem = (who: string) =>
+  ApiProblemResponse(403, `The signed-in user is not ${who}.`, 'Insufficient permissions.');
+
+const ApiRequestNotFoundProblem = (description = 'No request has this ID.') =>
+  ApiProblemResponse(404, description, "Request with ID '42' could not be found.");
+
 @ApiTags('Requests')
+@ApiCookieAuth('session')
 @Controller('requests')
 export class RequestsController {
   constructor(private readonly requestsService: RequestsService) {}
@@ -35,8 +64,14 @@ export class RequestsController {
   @ApiOperation({
     summary: 'Retrieves a paginated list of requests.',
     description:
-      'Admins get every request (the Requests Queue); employees get only their own (My Requests). Supports filtering by status, display ID, requester name/email, and requested item name, plus sorting by submission date or employee name.',
+      "Admins get every request (the Requests Queue); employees get only their own (My Requests). Supports filtering by status, display ID, requester name/email, and requested item name, plus sorting by submission date (newest/oldest) or employee name (A-Z). Each line item carries the asset's live `availableStock` at the request's office.",
   })
+  @ApiOkResponse({
+    description: 'One page of requests, plus paging totals.',
+    type: PaginatedRequestsResponseDto,
+  })
+  @ApiValidationProblemResponse(PaginatedRequestsQueryDto)
+  @ApiUnauthorizedProblem()
   @Get()
   paginate(
     @Query() paginatedRequestsQueryDto: PaginatedRequestsQueryDto,
@@ -58,6 +93,8 @@ export class RequestsController {
       'Takes the same search filters as the list (not status) and the same scoping: admins count every request, employees their own. inProcessing = approved + ready_for_pickup + for_delivery + received. For the low-stock card, use GET /assets?stockLevel=low_stock.',
   })
   @ApiOkResponse({ type: RequestCounts })
+  @ApiValidationProblemResponse(RequestCountsQueryDto)
+  @ApiUnauthorizedProblem()
   @Get('counts')
   counts(
     @Query() countsQueryDto: RequestCountsQueryDto,
@@ -71,6 +108,13 @@ export class RequestsController {
     description:
       'Completed, rejected and cancelled requests across all requesters (FR-016a), with resolvedAt and the stored rejectionReason / cancellationReason. Same search, filters and paging as the list; newest / oldest sort by resolution date.',
   })
+  @ApiOkResponse({
+    description: 'One page of resolved requests, plus paging totals.',
+    type: PaginatedRequestsResponseDto,
+  })
+  @ApiValidationProblemResponse(PaginatedRequestHistoryQueryDto)
+  @ApiUnauthorizedProblem()
+  @ApiForbiddenProblem('an admin')
   @Roles('admin')
   @Get('history')
   history(
@@ -85,6 +129,16 @@ export class RequestsController {
     description:
       "Employees can only fetch their own requests; anyone else's returns 404.",
   })
+  @ApiRequestIdParam()
+  @ApiOkResponse({
+    description:
+      'The request, with its requester, reviewer, line items (with live `availableStock`) and timeline.',
+    type: RequestResponseDto,
+  })
+  @ApiUnauthorizedProblem()
+  @ApiRequestNotFoundProblem(
+    "No request has this ID, or (for an employee) it is someone else's.",
+  )
   @Get(':id')
   find(@Param('id', ParseIntPipe) id: number, @Req() request: ExpressRequest) {
     return this.requestsService.find(id, request.user!);
@@ -93,9 +147,34 @@ export class RequestsController {
   @ApiOperation({
     summary: 'Creates a new request using the supplied item details.',
     description:
-      "Employee only. Stock is reserved at the employee's own office; another office's stock can't be requested.",
+      "Employee only, submitted as the signed-in user. Stock is reserved at the employee's own office; another office's stock can't be requested. All or nothing: every line is checked and reserved in one transaction, and if any line fails (unknown asset, not enough stock) nothing is created or reserved. Emails the requester and all admins. Business-rule refusals are a 400 whose `title` is a readable message (see the examples); field errors are a 400 with an `errors` array.",
   })
-  @ApiValidationProblemResponse(CreateRequestDto)
+  @ApiCreatedResponse({
+    description:
+      'The new request, in `pending_approval`, with its display ID (`REQ-<year>-<id>`), `createdAt` and lines.',
+    type: RequestResponseDto,
+  })
+  @ApiValidationProblemResponse(CreateRequestDto, {
+    insufficientStock: {
+      summary: 'Not enough Available units at the requester’s office',
+      title: "Insufficient stock for 'Dell 24 Monitor' at Cebu: requested 3, 1 available.",
+    },
+    unknownAsset: {
+      summary: 'A line names an asset that does not exist',
+      title: "Asset with ID '99' could not be found.",
+    },
+    duplicateAsset: {
+      summary: 'The same asset appears on two lines',
+      title: 'Each asset may only appear once per request.',
+    },
+    unknownOffice: {
+      summary: "The requester's office isn't one stock is held at",
+      title:
+        "Your account's office ('Manila') isn't one we hold stock at; ask an admin to update it.",
+    },
+  })
+  @ApiUnauthorizedProblem()
+  @ApiForbiddenProblem('an employee')
   @Roles('employee')
   @Post()
   create(
@@ -110,9 +189,22 @@ export class RequestsController {
   @ApiOperation({
     summary: 'Updates an existing request, including the review flow.',
     description:
-      'Drives approve, reject (with a reason), release (ready_for_pickup with a pickupLocation, or for_delivery) and complete. The two release states are peers: an approved request can go to either and switch between them, and ready_for_pickup can be set again to change the location. Complete is only accepted once the requester has signed for the items (status received) and moves no stock. A rejection returns the reserved units to Available. Illegal status transitions are refused with a 409.',
+      'Admin only. Drives approve, reject (with a reason), release and complete: `pending_approval` → `approved` | `rejected`; `approved` → `ready_for_pickup` (with a pickupLocation) | `for_delivery`; the two release states are peers and can switch between each other, and `ready_for_pickup` can be set again to change the location; `received` → `completed`. `received` itself is only reached through POST /requests/:id/receive. Complete moves no stock; a rejection returns the reserved units to Available. Any other transition is refused with a 409. Each status change emails the requester.',
+  })
+  @ApiRequestIdParam()
+  @ApiOkResponse({
+    description: 'The updated request.',
+    type: RequestResponseDto,
   })
   @ApiValidationProblemResponse(UpdateRequestDto)
+  @ApiUnauthorizedProblem()
+  @ApiForbiddenProblem('an admin')
+  @ApiRequestNotFoundProblem()
+  @ApiProblemResponse(
+    409,
+    'The requested status change is not allowed from the current status.',
+    "A request with status 'ready_for_pickup' cannot be moved to 'completed'.",
+  )
   @Roles('admin')
   @Patch(':id')
   update(
@@ -130,7 +222,21 @@ export class RequestsController {
     description:
       "An employee may cancel their own request while it is pending approval; an admin may cancel an approved, ready-for-pickup or for-delivery request that can't be fulfilled. The request's stock returns to Available and the requester is emailed. Any other status (including received) returns 409.",
   })
+  @ApiRequestIdParam()
+  @ApiOkResponse({
+    description: 'The cancelled request, with cancellationReason and cancelledBy.',
+    type: RequestResponseDto,
+  })
   @ApiValidationProblemResponse(CancelRequestDto)
+  @ApiUnauthorizedProblem()
+  @ApiRequestNotFoundProblem(
+    "No request has this ID, or (for an employee) it is someone else's.",
+  )
+  @ApiProblemResponse(
+    409,
+    'The request cannot be cancelled from its current status by this user.',
+    "A request with status 'approved' cannot be cancelled; you can only cancel a request while it is pending approval.",
+  )
   @HttpCode(200)
   @Post(':id/cancel')
   cancel(
@@ -148,7 +254,21 @@ export class RequestsController {
     description:
       "Employee only, on their own request while it is for_delivery or ready_for_pickup. Moves the request to received, stores the typed name and notes, assigns the reserved units to the requester (the items leave the store) and emails them. Someone else's request returns 404; any other status, including an already-received one, returns 409.",
   })
+  @ApiRequestIdParam()
+  @ApiOkResponse({
+    description:
+      'The request, now `received`, with receivedAt, receivedSignature and receivedNotes.',
+    type: RequestResponseDto,
+  })
   @ApiValidationProblemResponse(ReceiveRequestDto)
+  @ApiUnauthorizedProblem()
+  @ApiForbiddenProblem('an employee')
+  @ApiRequestNotFoundProblem("No request has this ID, or it is someone else's.")
+  @ApiProblemResponse(
+    409,
+    'The request is not waiting to be signed for.',
+    "A request with status 'approved' cannot be signed for; the accountability form is only accepted while a request is for_delivery or ready_for_pickup.",
+  )
   @Roles('employee')
   @HttpCode(200)
   @Post(':id/receive')
@@ -166,6 +286,11 @@ export class RequestsController {
     summary: 'Removes a request from the system by ID.',
     description: 'Admin only.',
   })
+  @ApiRequestIdParam()
+  @ApiOkResponse({ description: 'The removed request.', type: RequestResponseDto })
+  @ApiUnauthorizedProblem()
+  @ApiForbiddenProblem('an admin')
+  @ApiRequestNotFoundProblem()
   @Roles('admin')
   @Delete(':id')
   delete(@Param('id', ParseIntPipe) id: number) {

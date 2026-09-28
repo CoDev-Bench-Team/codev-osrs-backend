@@ -79,7 +79,15 @@ const createValidationErrors = (bodyType: Type<unknown>) => {
   }));
 };
 
-export const ApiValidationProblemResponse = (bodyType?: Type<unknown>) =>
+/**
+ * Documents the 400 response. `ruleErrors` adds examples for 400s a handler
+ * throws after validation passes (business rules, such as insufficient
+ * stock): those have no `errors` array, just a `title` naming the problem.
+ */
+export const ApiValidationProblemResponse = (
+  bodyType?: Type<unknown>,
+  ruleErrors: Record<string, { summary: string; title: string }> = {},
+) =>
   ApiResponse({
     status: 400,
     description: 'The request contains invalid data.',
@@ -96,6 +104,20 @@ export const ApiValidationProblemResponse = (bodyType?: Type<unknown>) =>
               errors: bodyType ? createValidationErrors(bodyType) : [],
             },
           },
+          ...Object.fromEntries(
+            Object.entries(ruleErrors).map(([name, { summary, title }]) => [
+              name,
+              {
+                summary,
+                value: {
+                  type: 'about:blank',
+                  title,
+                  status: 400,
+                  detail: 'Bad Request',
+                },
+              },
+            ]),
+          ),
         },
       },
     },
