@@ -17,6 +17,7 @@ import { RequestsService } from './requests.service.js';
 import { CreateRequestDto } from './dto/create-request.dto.js';
 import { UpdateRequestDto } from './dto/update-request.dto.js';
 import { CancelRequestDto } from './dto/cancel-request.dto.js';
+import { ReceiveRequestDto } from './dto/receive-request.dto.js';
 import { PaginatedRequestsQueryDto } from './dto/paginated-requests-query.dto.js';
 import { PaginatedRequestHistoryQueryDto } from './dto/paginated-request-history-query.dto.js';
 import {
@@ -54,7 +55,7 @@ export class RequestsController {
   @ApiOperation({
     summary: 'Counts requests per status, for filter chips and summary cards.',
     description:
-      'Takes the same search filters as the list (not status) and the same scoping: admins count every request, employees their own. inProcessing = approved + ready_for_pickup + for_delivery. For the low-stock card, use GET /assets?stockLevel=low_stock.',
+      'Takes the same search filters as the list (not status) and the same scoping: admins count every request, employees their own. inProcessing = approved + ready_for_pickup + for_delivery + received. For the low-stock card, use GET /assets?stockLevel=low_stock.',
   })
   @ApiOkResponse({ type: RequestCounts })
   @Get('counts')
@@ -109,7 +110,7 @@ export class RequestsController {
   @ApiOperation({
     summary: 'Updates an existing request, including the review flow.',
     description:
-      'Drives approve, reject (with a reason), release (ready_for_pickup with a pickupLocation, or for_delivery) and complete. The two release states are peers: an approved request can go to either and switch between them, and ready_for_pickup can be set again to change the location. Stock stays reserved until the request is completed, when its units are assigned to the requester; a rejection returns them to Available. Illegal status transitions are refused with a 409.',
+      'Drives approve, reject (with a reason), release (ready_for_pickup with a pickupLocation, or for_delivery) and complete. The two release states are peers: an approved request can go to either and switch between them, and ready_for_pickup can be set again to change the location. Complete is only accepted once the requester has signed for the items (status received) and moves no stock. A rejection returns the reserved units to Available. Illegal status transitions are refused with a 409.',
   })
   @ApiValidationProblemResponse(UpdateRequestDto)
   @Roles('admin')
@@ -127,7 +128,7 @@ export class RequestsController {
   @ApiOperation({
     summary: 'Cancels a request, with a reason.',
     description:
-      "An employee may cancel their own request while it is pending approval; an admin may cancel an approved, ready-for-pickup or for-delivery request that can't be fulfilled. The request's stock returns to Available and the requester is emailed. Any other status returns 409.",
+      "An employee may cancel their own request while it is pending approval; an admin may cancel an approved, ready-for-pickup or for-delivery request that can't be fulfilled. The request's stock returns to Available and the requester is emailed. Any other status (including received) returns 409.",
   })
   @ApiValidationProblemResponse(CancelRequestDto)
   @HttpCode(200)
@@ -140,6 +141,25 @@ export class RequestsController {
     // The global AuthGuard rejects unauthenticated requests before this
     // handler runs, so `request.user` is always populated here.
     return this.requestsService.cancel(id, cancelRequestDto, request.user!);
+  }
+
+  @ApiOperation({
+    summary: 'Signs the Accountability Form: the requester confirms receipt.',
+    description:
+      "Employee only, on their own request while it is for_delivery or ready_for_pickup. Moves the request to received, stores the typed name and notes, assigns the reserved units to the requester (the items leave the store) and emails them. Someone else's request returns 404; any other status, including an already-received one, returns 409.",
+  })
+  @ApiValidationProblemResponse(ReceiveRequestDto)
+  @Roles('employee')
+  @HttpCode(200)
+  @Post(':id/receive')
+  receive(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() receiveRequestDto: ReceiveRequestDto,
+    @Req() request: ExpressRequest,
+  ) {
+    // The global AuthGuard rejects unauthenticated requests before this
+    // handler runs, so `request.user` is always populated here.
+    return this.requestsService.receive(id, receiveRequestDto, request.user!);
   }
 
   @ApiOperation({

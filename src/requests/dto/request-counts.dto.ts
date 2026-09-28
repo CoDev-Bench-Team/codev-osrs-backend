@@ -2,11 +2,13 @@ import { ApiProperty, OmitType } from '@nestjs/swagger';
 import { RequestStatus } from '../entities/request.entity.js';
 import { PaginatedRequestsQueryDto } from './paginated-requests-query.dto.js';
 
-/** Approved and in handover: the queue's "In processing" card. */
+/** Approved, in handover, or received and awaiting completion: the queue's
+ * "In processing" card. */
 export const IN_PROCESSING_STATUSES = [
   RequestStatus.APPROVED,
   RequestStatus.READY_FOR_PICKUP,
   RequestStatus.FOR_DELIVERY,
+  RequestStatus.RECEIVED,
 ] as const;
 
 /** The list's search filters, without paging, sorting or the status filter
@@ -29,6 +31,7 @@ export class RequestCounts {
       approved: 7,
       ready_for_pickup: 7,
       for_delivery: 7,
+      received: 3,
       rejected: 12,
       completed: 190,
       cancelled: 8,
@@ -37,8 +40,8 @@ export class RequestCounts {
   byStatus: Record<RequestStatus, number>;
 
   @ApiProperty({
-    description: 'Approved + ready for pickup + for delivery.',
-    example: 21,
+    description: 'Approved + ready for pickup + for delivery + received.',
+    example: 24,
   })
   inProcessing: number;
 }

@@ -26,6 +26,7 @@ import {
 import { CreateRequestDto } from './dto/create-request.dto.js';
 import { UpdateRequestDto } from './dto/update-request.dto.js';
 import { CancelRequestDto } from './dto/cancel-request.dto.js';
+import { ReceiveRequestDto } from './dto/receive-request.dto.js';
 import {
   PaginatedRequestsQueryDto,
   RequestSortOrder,
@@ -67,13 +68,16 @@ const LEGAL_TRANSITIONS: Record<RequestStatus, RequestStatus[]> = {
     RequestStatus.APPROVED,
     RequestStatus.READY_FOR_PICKUP,
   ],
-  [RequestStatus.COMPLETED]: [
-    RequestStatus.READY_FOR_PICKUP,
-    RequestStatus.FOR_DELIVERY,
-  ],
+  // Only through `receive()`, when the requester signs the Accountability
+  // Form (ADR-0009); no one sets it directly.
+  [RequestStatus.RECEIVED]: [],
+  [RequestStatus.COMPLETED]: [RequestStatus.RECEIVED],
   // Only through `cancel()`, which has its own per-role rules.
   [RequestStatus.CANCELLED]: [],
 };
+
+/** Statuses the requester may sign the Accountability Form from (FR-012a). */
+const RECEIVABLE = [RequestStatus.FOR_DELIVERY, RequestStatus.READY_FOR_PICKUP];
 
 /** Statuses an employee may cancel their own request from (FR-010a). */
 const EMPLOYEE_CANCELLABLE = [RequestStatus.PENDING_APPROVAL];
@@ -486,22 +490,10 @@ export class RequestsService {
 
       // Stock reserved at submit stays reserved through approval and
       // handover (ADR-0006, FR-008/011), and leaves the store only when the
-      // request is completed (FR-012): the units are then assigned to the
-      // requester. A rejection returns them to the shelf. Assigned units
-      // keep their request link as a record of which request issued them;
-      // returned units drop it so a later request can claim them.
-      if (status === RequestStatus.COMPLETED) {
-        await this.moveRequestUnits(
-          manager,
-          request,
-          [InventoryItemStatus.RESERVED],
-          {
-            status: InventoryItemStatus.ASSIGNED,
-            assignedTo: request.requestor,
-            assignedAt: changedAt,
-          },
-        );
-      } else if (status === RequestStatus.REJECTED) {
+      // requester signs for it (`receive()`, ADR-0009); completing moves no
+      // stock (FR-012). A rejection returns the units to the shelf, dropping
+      // their request link so a later request can claim them.
+      if (status === RequestStatus.REJECTED) {
         await this.moveRequestUnits(
           manager,
           request,
@@ -598,14 +590,15 @@ export class RequestsService {
       if (!cancellable.includes(currentStatus)) {
         throw new ConflictException(
           isAdmin
-            ? `A request with status '${currentStatus}' cannot be cancelled by an admin; only approved requests not yet completed can be (reject a pending request instead).`
+            ? `A request with status '${currentStatus}' cannot be cancelled by an admin; only approved requests not yet received can be (reject a pending request instead).`
             : `A request with status '${currentStatus}' cannot be cancelled; you can only cancel a request while it is pending approval.`,
         );
       }
 
       // The reserved units go back on the shelf, free for another request to
-      // claim. Assigned is included for requests approved before stock
-      // moved to completion, whose units were assigned on approval.
+      // claim. Assigned is included for requests approved under BEN-110's
+      // original rule, whose units were assigned on approval. (A received
+      // request's units are assigned too, but it can't be cancelled.)
       await this.moveRequestUnits(
         manager,
         request,
@@ -649,6 +642,80 @@ export class RequestsService {
     );
 
     return cancelled;
+  }
+
+  /**
+   * The requester signs the Accountability Form for a handed-over request
+   * (FR-012a/b, ADR-0009). The request moves to Received and its reserved
+   * units are assigned to the requester in the same transaction: this is
+   * when the items leave the store. Signing twice is refused.
+   */
+  async receive(
+    id: number,
+    receiveRequestDto: ReceiveRequestDto,
+    actor: User,
+  ): Promise<Request> {
+    // Employee-only (controller), and scoped by `actor`, so someone else's
+    // request is a 404.
+    const request = await this.find(id, actor);
+    const signature = receiveRequestDto.fullName.trim();
+    const notes = receiveRequestDto.notes?.trim() || null;
+    const changedAt = new Date();
+    let previousStatus = request.status;
+
+    await this.requestsRepository.manager.transaction(async (manager) => {
+      const currentStatus = await this.lockedStatus(manager, id);
+      previousStatus = currentStatus;
+      if (!RECEIVABLE.includes(currentStatus)) {
+        throw new ConflictException(
+          `A request with status '${currentStatus}' cannot be signed for; the accountability form is only accepted while a request is for_delivery or ready_for_pickup.`,
+        );
+      }
+
+      // Assigned units keep their request link as a record of which request
+      // issued them.
+      await this.moveRequestUnits(
+        manager,
+        request,
+        [InventoryItemStatus.RESERVED],
+        {
+          status: InventoryItemStatus.ASSIGNED,
+          assignedTo: request.requestor,
+          assignedAt: changedAt,
+        },
+      );
+
+      await manager.save(Request, {
+        ...request,
+        status: RequestStatus.RECEIVED,
+        receivedAt: changedAt,
+        receivedSignature: signature,
+        receivedNotes: notes,
+        updatedBy: actor,
+        timeline: [
+          ...request.timeline,
+          {
+            status: RequestStatus.RECEIVED,
+            at: changedAt.toISOString(),
+            byUserId: actor.id,
+            note: `Signed by ${signature}`,
+          },
+        ],
+      });
+    });
+
+    const received = await this.find(id);
+
+    // Sent after the transaction commits, like every status email.
+    await this.sendStatusChangeEmail(
+      received,
+      RequestStatus.RECEIVED,
+      changedAt,
+      undefined,
+      previousStatus,
+    );
+
+    return received;
   }
 
   /**
@@ -751,6 +818,8 @@ export class RequestsService {
         return this.mailerService.sendRequestReadyForPickupEmail(context);
       case RequestStatus.FOR_DELIVERY:
         return this.mailerService.sendRequestForDeliveryEmail(context);
+      case RequestStatus.RECEIVED:
+        return this.mailerService.sendRequestReceivedEmail(context);
       case RequestStatus.COMPLETED:
         return this.mailerService.sendRequestCompletedEmail(context);
       default:

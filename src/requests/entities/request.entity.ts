@@ -19,6 +19,7 @@ export enum RequestStatus {
   APPROVED = 'approved',
   READY_FOR_PICKUP = 'ready_for_pickup',
   FOR_DELIVERY = 'for_delivery',
+  RECEIVED = 'received',
   REJECTED = 'rejected',
   COMPLETED = 'completed',
   CANCELLED = 'cancelled',
@@ -81,6 +82,19 @@ export class Request {
    * Set when the request is marked ready for pickup (FR-011a). */
   @Column({ type: 'varchar', length: 255, nullable: true })
   pickupLocation: string | null;
+
+  /** When the requester signed the Accountability Form, moving the request
+   * to Received (ADR-0009). */
+  @Column({ type: 'timestamp', nullable: true })
+  receivedAt: Date | null;
+
+  /** The full name the requester typed to sign the Accountability Form. */
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  receivedSignature: string | null;
+
+  /** The optional "Other Notes" from the Accountability Form. */
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  receivedNotes: string | null;
 
   /** Required when the request is cancelled; shown back to the requester. */
   @Column({ type: 'varchar', length: 500, nullable: true })

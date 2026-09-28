@@ -81,6 +81,7 @@ const STATUS_LABELS: Record<string, string> = {
     approved: 'Approved',
     ready_for_pickup: 'Ready for pickup',
     for_delivery: 'For Delivery',
+    received: 'Received',
     rejected: 'Rejected',
     completed: 'Completed',
     cancelled: 'Cancelled',
@@ -240,6 +241,25 @@ export class MailerService {
         });
     }
 
+    /** "You've received your items" — sent when the requester signs the
+     * Accountability Form (ADR-0009). Orange pill, as the design colours
+     * Received (`#ff8d28` on a 10% tint). */
+    async sendRequestReceivedEmail(
+        context: RequestEmailContext,
+    ): Promise<void> {
+        await this.sendStatusChange(context, {
+            subject: `You've received your items for ${context.displayId}`,
+            pillLabel: 'Received',
+            pillBackground: '#fff4ea',
+            pillColor: '#ff8d28',
+            title: "You've received your items",
+            body: `Hi ${context.requesterFirstName} — you signed the accountability form, so your request moved from ${statusLabel(context.previousStatus, 'For Delivery')} to Received. The items below are now assigned to you. Admin will close the request shortly.`,
+            dateLine: `Received ${formatSubmittedAt(context.submittedAt)}`,
+            showItems: true,
+            ctaLabel: 'View request',
+        });
+    }
+
     /** "Your request is complete" (BEN-110). The ticket defines no design for
      * this one — copy and the purple pill follow the other status emails and
      * the design file's recolour of Completed (frontend spec, 2026-09-15). */
@@ -252,7 +272,7 @@ export class MailerService {
             pillBackground: '#f1ebfb',
             pillColor: '#6b3fc4',
             title: 'Your request is complete',
-            body: `Hi ${context.requesterFirstName} — Admin changed the status of your request from ${statusLabel(context.previousStatus, 'For Delivery')} to Completed. Your items have been handed over and assigned to you, so this request is now closed. Need anything else? Just submit a new request.`,
+            body: `Hi ${context.requesterFirstName} — Admin changed the status of your request from ${statusLabel(context.previousStatus, 'Received')} to Completed. You've already signed for your items, so this request is now closed. Need anything else? Just submit a new request.`,
             dateLine: `Completed ${formatSubmittedAt(context.submittedAt)}`,
             showItems: true,
             ctaLabel: 'View request',
