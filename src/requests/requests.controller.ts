@@ -284,7 +284,8 @@ export class RequestsController {
 
   @ApiOperation({
     summary: 'Removes a request from the system by ID.',
-    description: 'Admin only.',
+    description:
+      'Admin only. A soft delete: the request disappears from every list but stays in the database with deletedAt and deletedBy. Units it still holds as Reserved return to Available; units already Assigned to the employee (a received or completed request) stay assigned. No email is sent.',
   })
   @ApiRequestIdParam()
   @ApiOkResponse({ description: 'The removed request.', type: RequestResponseDto })
@@ -293,7 +294,10 @@ export class RequestsController {
   @ApiRequestNotFoundProblem()
   @Roles('admin')
   @Delete(':id')
-  delete(@Param('id', ParseIntPipe) id: number) {
-    return this.requestsService.delete(id);
+  delete(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: ExpressRequest,
+  ) {
+    return this.requestsService.delete(id, request.user!);
   }
 }

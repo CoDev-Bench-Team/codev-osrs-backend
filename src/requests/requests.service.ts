@@ -827,15 +827,37 @@ export class RequestsService {
     }
   }
 
-  async delete(id: number): Promise<Request> {
-    const requestToDelete = await this.requestsRepository.findOneBy({ id });
-    if (!requestToDelete) {
-      throw new NotFoundException(
-        `Request with ID '${id}' could not be found.`,
-      );
-    }
+  /**
+   * Soft-deletes a request. Units it still holds as Reserved go back on the
+   * shelf in the same transaction, or they would stay reserved for a request
+   * nobody can see. Assigned units (a received or completed request) stay
+   * with the employee who has them.
+   */
+  async delete(id: number, actor: User): Promise<Request> {
+    const request = await this.find(id);
 
-    return this.requestsRepository.softRemove(requestToDelete);
+    await this.requestsRepository.manager.transaction(async (manager) => {
+      await this.lockedStatus(manager, id);
+      await this.moveRequestUnits(
+        manager,
+        request,
+        [InventoryItemStatus.RESERVED],
+        {
+          status: InventoryItemStatus.AVAILABLE,
+          assignedTo: null,
+          assignedAt: null,
+          request: null,
+        },
+      );
+      await manager.update(Request, id, { deletedBy: actor });
+      await manager.softDelete(Request, id);
+    });
+
+    return this.requestsRepository.findOneOrFail({
+      where: { id },
+      relations: RELATIONS,
+      withDeleted: true,
+    });
   }
 
   /**
