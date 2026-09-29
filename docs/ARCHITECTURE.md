@@ -41,3 +41,52 @@ New users are provisioned when they first sign in. Accounts matching `ADMIN_EMAI
 PostgreSQL is the source of truth. Do not enable TypeORM schema synchronization for local or production work. Create a migration for schema changes, review its generated SQL and rollback behavior, and apply it locally before submitting. The deployment workflow applies production migrations before deploying the API; see [Deployment](../DEPLOYMENT.md).
 
 For endpoint details, use Swagger. For test boundaries and change workflow, see [Contributing](../CONTRIBUTING.md).
+
+## Entity Relationships
+
+```mermaid
+erDiagram
+	USER ||--o{ REQUEST : requestor
+	USER o|--o{ REQUEST : reviewed_by
+	USER o|--o{ REQUEST : audit
+	REQUEST ||--o{ REQUEST_ASSET : contains
+	ASSET ||--o{ REQUEST_ASSET : requested_as
+	ASSET ||--o{ INVENTORY_ITEM : stocked_as
+	REQUEST o|--o{ INVENTORY_ITEM : reserves
+	USER o|--o{ INVENTORY_ITEM : assigned_to
+	USER o|--o{ INVENTORY_ITEM : audit
+	USER o|--o{ ASSET : audit
+	USER o|--o{ USER : audit
+
+	USER {
+		int id PK
+		string role
+		string location
+	}
+	REQUEST {
+		int id PK
+		int requestor_id FK
+		int reviewed_by_id FK "optional"
+		string status
+	}
+	REQUEST_ASSET {
+		int id PK
+		int request_id FK
+		int asset_id FK
+		int quantity
+	}
+	ASSET {
+		int id PK
+		string name
+		string category
+	}
+	INVENTORY_ITEM {
+		int id PK
+		int asset_id FK
+		int request_id FK "optional"
+		int assigned_to_id FK "optional"
+		string status
+	}
+```
+
+Audit relationships represent each entity's optional `createdBy`, `updatedBy`, and `deletedBy` references to `User`.
