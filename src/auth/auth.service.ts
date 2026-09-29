@@ -77,6 +77,14 @@ export class AuthService {
       );
     }
 
+    const adminEmails = this.config
+      .get<string>('ADMIN_EMAILS', '')
+      .split(',')
+      .map((adminEmail) => adminEmail.trim().toLowerCase())
+      .filter(Boolean);
+    const isAdminEmail = adminEmails.includes(normalizedEmail);
+    const roleForEmail = isAdminEmail ? UserRole.ADMIN : UserRole.EMPLOYEE;
+
     let user = await this.usersRepository.findOne({
       where: {
         googleSubject: sub,
@@ -92,6 +100,7 @@ export class AuthService {
       user.firstName = givenName ?? user.firstName;
       user.lastName = familyName ?? user.lastName;
       user.avatarUrl = picture ?? user.avatarUrl;
+      user.role = roleForEmail;
       return this.usersRepository.save(user);
     }
 
@@ -116,10 +125,9 @@ export class AuthService {
       user.firstName = givenName ?? user.firstName;
       user.lastName = familyName ?? user.lastName;
       user.avatarUrl = picture ?? user.avatarUrl;
+      user.role = roleForEmail;
       return this.usersRepository.save(user);
     }
-
-    const defaultRole = this.config.get<string>('AUTH_DEFAULT_ROLE');
 
     const newUser = this.usersRepository.create({
       googleSubject: sub,
@@ -127,7 +135,7 @@ export class AuthService {
       firstName: givenName ?? '',
       lastName: familyName ?? '',
       avatarUrl: picture,
-      role: defaultRole as UserRole,
+      role: roleForEmail,
       createdAt: new Date(),
     });
 
