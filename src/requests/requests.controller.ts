@@ -10,7 +10,7 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request as ExpressRequest } from 'express';
 import { RequestsService } from './requests.service.js';
 import { CreateRequestDto } from './dto/create-request.dto.js';
@@ -24,28 +24,34 @@ import { Roles } from '../auth/roles.decorator.js';
 export class RequestsController {
   constructor(private readonly requestsService: RequestsService) {}
 
+  @ApiCookieAuth('session')
   @ApiOperation({
     summary: 'Retrieves a paginated list of requests.',
     description:
       'Supports filtering by status, display ID, requester name/email, and requested item name, plus sorting by submission date.',
   })
+  @Roles('admin', 'employee')
   @Get()
-  paginate(@Query() paginatedRequestsQueryDto: PaginatedRequestsQueryDto) {
+  list(@Query() paginatedRequestsQueryDto: PaginatedRequestsQueryDto) {
     return this.requestsService.paginate(paginatedRequestsQueryDto);
   }
 
+  @ApiCookieAuth('session')
   @ApiOperation({
     summary: 'Fetches a single request by its numeric identifier.',
   })
+  @Roles('admin', 'employee')
   @Get(':id')
   find(@Param('id', ParseIntPipe) id: number) {
     return this.requestsService.find(id);
   }
 
+  @ApiCookieAuth('session')
   @ApiOperation({
     summary: 'Creates a new request using the supplied item details.',
   })
   @ApiValidationProblemResponse(CreateRequestDto)
+  @Roles('admin', 'employee')
   @Post()
   create(
     @Body() createRequestDto: CreateRequestDto,
@@ -56,6 +62,7 @@ export class RequestsController {
     return this.requestsService.create(createRequestDto, request.user!);
   }
 
+  @ApiCookieAuth('session')
   @ApiOperation({
     summary: 'Updates an existing request, including the review flow.',
     description:
@@ -74,7 +81,9 @@ export class RequestsController {
     return this.requestsService.update(id, updateRequestDto, request.user!);
   }
 
+  @ApiCookieAuth('session')
   @ApiOperation({ summary: 'Removes a request from the system by ID.' })
+  @Roles('admin')
   @Delete(':id')
   delete(@Param('id', ParseIntPipe) id: number) {
     return this.requestsService.delete(id);
