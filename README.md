@@ -24,7 +24,7 @@ npm run start:dev
 
 The API listens on [http://localhost:3000](http://localhost:3000) by default. Swagger UI is served at `/` and is the interactive API reference. Schema synchronization is disabled; use migrations for database changes.
 
-See [Architecture](docs/ARCHITECTURE.md), [Contributing](CONTRIBUTING.md), and [Deployment](DEPLOYMENT.md) for domain concepts, development workflow, and production operations.
+See [Architecture](docs/ARCHITECTURE.md), [Contributing](docs/CONTRIBUTING.md), [Deployment](docs/DEPLOYMENT.md), and [Integration](docs/INTEGRATION.md) for domain concepts, development workflow, production operations, and integration details.
 
 ## Common Commands
 
@@ -42,7 +42,7 @@ The e2e suite imports the full application and requires a reachable PostgreSQL d
 
 ## Deployment
 
-See [Deployment](DEPLOYMENT.md) for the CI pipeline, production environment, migrations, and release process.
+See [Deployment](docs/DEPLOYMENT.md) for the CI pipeline, production environment, migrations, and release process.
 
 ## Local Services
 
