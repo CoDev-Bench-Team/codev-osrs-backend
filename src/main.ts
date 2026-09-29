@@ -47,7 +47,30 @@ async function bootstrap() {
       in: 'cookie',
       name: 'session',
     })
-    .addTag('CoDev OSRS')
+    .addTag(
+      'CoDev OSRS',
+      'Office-supplies request and inventory management API.',
+    )
+    .addTag(
+      'Auth',
+      'Google Workspace sign-in, session-cookie management, and the current-user session endpoint.',
+    )
+    .addTag(
+      'Assets',
+      'Catalog definitions for office equipment, including specifications, low-stock thresholds, and available stock counts.',
+    )
+    .addTag(
+      'Inventory Items',
+      'Individual physical units linked to catalog assets, tracked by serial number, location, assignment, and availability status.',
+    )
+    .addTag(
+      'Requests',
+      'Employee equipment requests with stock reservation, administrative review, fulfillment status transitions, and request history.',
+    )
+    .addTag(
+      'Users',
+      'User accounts, roles, and office locations used for authentication, assignment, and request review.',
+    )
     .build();
   const documentFactory = () =>
     SwaggerModule.createDocument(app, swaggerConfig);

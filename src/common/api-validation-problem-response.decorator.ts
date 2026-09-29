@@ -2,6 +2,101 @@ import type { Type } from '@nestjs/common';
 import { getMetadataStorage, type ValidationArguments } from 'class-validator';
 import { ApiResponse } from '@nestjs/swagger';
 
+export const ApiExampleResponse = (
+  status: number,
+  description: string,
+  example: unknown,
+) =>
+  ApiResponse({
+    status,
+    description,
+    content: {
+      'application/json': {
+        schema: {
+          type: Array.isArray(example) ? 'array' : 'object',
+          example,
+        },
+        examples: {
+          success: { summary: description, value: example },
+        },
+      },
+    },
+  });
+
+const apiProblemResponse = (
+  status: number,
+  title: string,
+  description: string,
+  detail: string,
+) =>
+  ApiResponse({
+    status,
+    description,
+    content: {
+      'application/problem+json': {
+        schema: {
+          type: 'object',
+          required: ['type', 'title', 'status'],
+          properties: {
+            type: { type: 'string', example: 'about:blank' },
+            title: { type: 'string', example: title },
+            status: { type: 'integer', example: status },
+            detail: { type: 'string', example: detail },
+          },
+          example: { type: 'about:blank', title, status, detail },
+        },
+        examples: {
+          problem: {
+            summary: description,
+            value: { type: 'about:blank', title, status, detail },
+          },
+        },
+      },
+    },
+  });
+
+export const ApiBadRequestProblemResponse = (detail = 'Bad Request') =>
+  apiProblemResponse(
+    400,
+    detail,
+    'Invalid request data or parameters.',
+    'Bad Request',
+  );
+
+export const ApiUnauthorizedProblemResponse = (detail = 'Unauthorized') =>
+  apiProblemResponse(
+    401,
+    detail,
+    'Authentication is required.',
+    'Unauthorized',
+  );
+
+export const ApiForbiddenProblemResponse = (
+  detail = 'Insufficient permissions.',
+) =>
+  apiProblemResponse(
+    403,
+    detail,
+    'The operation is not permitted.',
+    'Forbidden',
+  );
+
+export const ApiNotFoundProblemResponse = (resource: string) =>
+  apiProblemResponse(
+    404,
+    `${resource} with ID '42' could not be found.`,
+    `The requested ${resource} does not exist.`,
+    'Not Found',
+  );
+
+export const ApiConflictProblemResponse = (detail: string) =>
+  apiProblemResponse(
+    409,
+    detail,
+    'The request conflicts with current resource state.',
+    'Conflict',
+  );
+
 const problemDetailsSchema = {
   type: 'object',
   required: ['type', 'title', 'status'],
@@ -20,6 +115,7 @@ const problemDetailsSchema = {
         },
       },
     },
+    detail: { type: 'string', example: 'The request is invalid.' },
   },
 };
 
@@ -79,7 +175,10 @@ const createValidationErrors = (bodyType: Type<unknown>) => {
   }));
 };
 
-export const ApiValidationProblemResponse = (bodyType?: Type<unknown>) =>
+export const ApiValidationProblemResponse = (
+  bodyType?: Type<unknown>,
+  additionalProblems: Record<string, { summary: string; detail: string }> = {},
+) =>
   ApiResponse({
     status: 400,
     description: 'The request contains invalid data.',
@@ -96,6 +195,20 @@ export const ApiValidationProblemResponse = (bodyType?: Type<unknown>) =>
               errors: bodyType ? createValidationErrors(bodyType) : [],
             },
           },
+          ...Object.fromEntries(
+            Object.entries(additionalProblems).map(([name, problem]) => [
+              name,
+              {
+                summary: problem.summary,
+                value: {
+                  type: 'about:blank',
+                  title: problem.detail,
+                  status: 400,
+                  detail: 'Bad Request',
+                },
+              },
+            ]),
+          ),
         },
       },
     },

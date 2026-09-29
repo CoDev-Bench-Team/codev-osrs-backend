@@ -210,16 +210,30 @@ If the application is later changed to use a single `DATABASE_URL`, update both 
 
 ### Vercel Runtime Configuration
 
-The Vercel project must have the production database variables available to the deployed application:
+Configure the following application variables in the Vercel Production environment. The API needs database connectivity, JWT signing, Google sign-in configuration, and a working SMTP connection. The mailer verifies its SMTP transport during application startup.
 
-- `POSTGRESQL_HOST`
-- `POSTGRESQL_PORT`
-- `POSTGRESQL_USER`
-- `POSTGRESQL_PASSWORD`
-- `POSTGRESQL_DATABASE`
-- `PORT` when a non-default port is required
+| Variable | Requirement | Purpose |
+| --- | --- | --- |
+| `POSTGRESQL_HOST` | Required | PostgreSQL hostname |
+| `POSTGRESQL_PORT` | Required | PostgreSQL port |
+| `POSTGRESQL_USER` | Required | PostgreSQL username |
+| `POSTGRESQL_PASSWORD` | Required | PostgreSQL password |
+| `POSTGRESQL_DATABASE` | Required | PostgreSQL database name |
+| `JWT_SECRET` | Required | Signs session JWTs |
+| `JWT_EXPIRES_IN` | Optional; defaults to `8h` | Session lifetime |
+| `GOOGLE_CLIENT_ID` | Required for Google sign-in | Verifies Google credentials for this OAuth client |
+| `GOOGLE_ALLOWED_DOMAIN` | Required for Google sign-in | Restricts sign-in to the company's Google Workspace domain |
+| `ADMIN_EMAILS` | Optional | Comma-separated email addresses assigned the admin role |
+| `SMTP_HOST` | Required | SMTP server hostname |
+| `SMTP_PORT` | Optional; defaults to `587` | SMTP server port |
+| `SMTP_USER` | Required by the configured SMTP server | SMTP authentication username |
+| `SMTP_PASSWORD` | Required by the configured SMTP server | SMTP authentication password |
+| `SMTP_DEFAULT_FROM` | Required for notification messages | Sender address displayed on email |
+| `PORTAL_URL` | Required for links in notification emails | Frontend portal base URL |
+| `CORS_ORIGINS` | Optional | Comma-separated allowed browser origins; unset allows any origin |
+| `PORT` | Optional; defaults to `3000` | API listening port |
 
-`VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` remain GitHub Actions deployment credentials/configuration; they are not application runtime secrets. Configure any future application secrets, such as JWT keys or API keys, in Vercel Production environment variables.
+`VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` are GitHub Actions deployment credentials/configuration; they are not application runtime settings. Do not put production credentials in the repository or in `.env.example`.
 
 If the Vercel project is connected directly to GitHub, disable Vercel automatic Git deployments so GitHub Actions remains the single production deployment path. The repository does not currently contain a `vercel.json` implementing this setting, so it must be configured in Vercel or added separately if that behavior is required.
 
