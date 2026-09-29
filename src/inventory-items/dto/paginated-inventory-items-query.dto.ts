@@ -1,4 +1,5 @@
-import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { AssetCategory } from '../../assets/entities/asset.entity.js';
 import { InventoryItemStatus } from '../entities/inventory-item.entity.js';
@@ -20,4 +21,11 @@ export class PaginatedInventoryItemsQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsEnum(InventoryItemStatus)
   status?: InventoryItemStatus;
+
+  @ApiPropertyOptional({ description: 'Filter by the ID of the user assigned to the inventory item.', example: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  assignedToId?: number;
 }
