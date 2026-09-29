@@ -22,6 +22,7 @@ import {
 import {
   MailerService,
   RequestEmailContext,
+  RequestEmailLine,
 } from '../mailer/mailer.service.js';
 import { CreateRequestDto } from './dto/create-request.dto.js';
 import { UpdateRequestDto } from './dto/update-request.dto.js';
@@ -89,6 +90,14 @@ const ADMIN_CANCELLABLE = [
   RequestStatus.READY_FOR_PICKUP,
   RequestStatus.FOR_DELIVERY,
 ];
+
+/** A request's lines as the emails list them: "Name - Model", as the design
+ * shows them (e.g. "Business Laptop - Dell Latitude"). */
+const emailLines = (request: Request): RequestEmailLine[] =>
+  request.items.map((item) => ({
+    itemName: [item.asset.name, item.asset.model].filter(Boolean).join(' - '),
+    quantity: item.quantity,
+  }));
 
 @Injectable()
 export class RequestsService {
@@ -428,10 +437,7 @@ export class RequestsService {
       displayId: request.displayId,
       submittedAt: request.createdAt,
       purpose: request.purpose,
-      items: request.items.map((item) => ({
-        itemName: item.asset.name,
-        quantity: item.quantity,
-      })),
+      items: emailLines(request),
       requesterFirstName: requestor.firstName,
       requesterFullName: `${requestor.firstName} ${requestor.lastName}`.trim(),
       requesterOffice: request.requestingOffice,
@@ -788,10 +794,7 @@ export class RequestsService {
       displayId: request.displayId,
       submittedAt: changedAt,
       purpose: request.purpose,
-      items: request.items.map((item) => ({
-        itemName: item.asset.name,
-        quantity: item.quantity,
-      })),
+      items: emailLines(request),
       requesterFirstName: request.requestor.firstName,
       requesterFullName:
         `${request.requestor.firstName} ${request.requestor.lastName}`.trim(),

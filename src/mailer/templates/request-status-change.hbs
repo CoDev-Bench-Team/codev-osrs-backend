@@ -65,7 +65,7 @@
                                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 4px;">
                                                 <tr>
                                                     <td style="padding: 20px 22px; border: 1px solid #f0b6c0; border-radius: 8px; background-color: #fdf2f4;">
-                                                        <div style="margin-bottom: 8px; color: #cc2f4a; font-size: 14px; font-weight: bold;">Reason for rejection</div>
+                                                        <div style="margin-bottom: 8px; color: #cc2f4a; font-size: 14px; font-weight: bold;">{{reasonLabel}}</div>
                                                         <div style="color: #cc2f4a; font-size: 14px; line-height: 1.5;">{{reason}}</div>
                                                     </td>
                                                 </tr>
@@ -102,7 +102,9 @@
                                             </table>
                                             {{/if}}
 
+                                            {{#if ctaLabel}}
                                             <a href="{{ctaUrl}}" style="display: inline-block; margin-top: 26px; padding: 14px 28px; border-radius: 6px; background-color: #cc2f4a; color: #ffffff; font-size: 15px; font-weight: bold; text-decoration: none;">{{ctaLabel}}</a>
+                                            {{/if}}
 
                                         </td>
                                     </tr>

@@ -62,6 +62,8 @@ export interface RequestEmailLine {
 export interface RequestEmailContext {
     requestId: number;
     displayId: string;
+    /** When the request was submitted — or, for status emails, when the
+     * status changed. It is the date the email shows. */
     submittedAt: Date;
     purpose: string | null;
     items: RequestEmailLine[];
@@ -103,12 +105,13 @@ export class MailerService {
         await this.mailerService.sendMail({
             from: process.env.SMTP_DEFAULT_FROM,
             to: user.email,
-            subject: 'Welcome to CoDev OSRS!',
+            subject: 'Your CoDev supply requests portal is ready',
             html: renderWelcomeTemplate({
                 name: user.firstName,
-                role: user.role,
                 portalUrl: process.env.PORTAL_URL,
+                year: new Date().getFullYear(),
             }),
+            attachments: [LOGO_ATTACHMENT],
         });
     }
 
@@ -196,6 +199,7 @@ export class MailerService {
             title: "Your equipment request wasn't approved",
             body: `Hi ${context.requesterFirstName} — Admin reviewed your request and wasn't able to approve it. Here's why:`,
             reason,
+            reasonLabel: 'Reason for rejection',
             ctaLabel: 'Submit a new request',
             ctaUrl: `${process.env.PORTAL_URL}/requests`,
         });
@@ -260,9 +264,8 @@ export class MailerService {
         });
     }
 
-    /** "Your request is complete" (BEN-110). The ticket defines no design for
-     * this one — copy and the purple pill follow the other status emails and
-     * the design file's recolour of Completed (frontend spec, 2026-09-15). */
+    /** "Request Completed", per the Figma "Status changed email - For
+     * completion" frame. The design has no button: the request is closed. */
     async sendRequestCompletedEmail(
         context: RequestEmailContext,
     ): Promise<void> {
@@ -271,11 +274,10 @@ export class MailerService {
             pillLabel: 'Completed',
             pillBackground: '#f1ebfb',
             pillColor: '#6b3fc4',
-            title: 'Your request is complete',
-            body: `Hi ${context.requesterFirstName} — Admin changed the status of your request from ${statusLabel(context.previousStatus, 'Received')} to Completed. You've already signed for your items, so this request is now closed. Need anything else? Just submit a new request.`,
+            title: 'Request Completed',
+            body: `Hi ${context.requesterFirstName} — this is a confirmation that your request ${context.displayId} is now complete. The equipment listed below has been successfully picked up/delivered.`,
             dateLine: `Completed ${formatSubmittedAt(context.submittedAt)}`,
             showItems: true,
-            ctaLabel: 'View request',
         });
     }
 
@@ -296,6 +298,7 @@ export class MailerService {
                 ? `Hi ${context.requesterFirstName} — you cancelled this request (it was ${statusLabel(context.previousStatus, 'Pending Approval')}), and the items it held have been released. Your reason:`
                 : `Hi ${context.requesterFirstName} — Admin changed the status of your request from ${statusLabel(context.previousStatus, 'Approved')} to Cancelled because it can't be fulfilled. Here's why:`,
             reason,
+            reasonLabel: 'Reason for cancellation',
             ctaLabel: 'Submit a new request',
             ctaUrl: `${process.env.PORTAL_URL}/requests`,
         });
@@ -312,10 +315,12 @@ export class MailerService {
             body: string;
             pickup?: string;
             reason?: string;
+            reasonLabel?: string;
             dateLine?: string;
             showItems?: boolean;
             showPurpose?: boolean;
-            ctaLabel: string;
+            /** Omit for an email with no button. */
+            ctaLabel?: string;
             ctaUrl?: string;
         },
     ): Promise<void> {
@@ -333,6 +338,7 @@ export class MailerService {
                 body: variant.body,
                 pickup: variant.pickup,
                 reason: variant.reason,
+                reasonLabel: variant.reasonLabel,
                 dateLine: variant.dateLine,
                 items: variant.showItems ? context.items : null,
                 purpose: variant.showPurpose ? context.purpose : null,
