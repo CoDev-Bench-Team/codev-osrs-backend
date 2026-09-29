@@ -28,7 +28,7 @@ export class RequestsController {
   @ApiOperation({
     summary: 'Retrieves a paginated list of requests.',
     description:
-      'Supports filtering by status, display ID, requester name/email, and requested item name, plus sorting by submission date.',
+      'Supports filtering by status, display ID, requester name/email or user ID, and requested item name, plus sorting by submission date.',
   })
   @Roles('admin', 'employee')
   @Get()

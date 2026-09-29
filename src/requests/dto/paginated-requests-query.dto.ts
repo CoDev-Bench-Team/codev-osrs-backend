@@ -39,6 +39,13 @@ export class PaginatedRequestsQueryDto {
   @IsString()
   requester?: string;
 
+  @ApiPropertyOptional({ description: 'Filter by the ID of the requesting user.', example: 42 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  requesterId?: number;
+
   @ApiPropertyOptional({ description: 'Filter by requested item name (partial match).' })
   @IsOptional()
   @IsString()

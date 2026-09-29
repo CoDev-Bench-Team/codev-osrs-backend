@@ -63,6 +63,7 @@ export class RequestsService {
       status,
       displayId,
       requester,
+      requesterId,
       itemName,
       sort = RequestSortOrder.NEWEST,
     } = query;
@@ -95,6 +96,9 @@ export class RequestsService {
           '(requestor.firstName ILIKE :requester OR requestor.lastName ILIKE :requester OR requestor.email ILIKE :requester)',
           { requester: `%${requester}%` },
         );
+      }
+      if (requesterId !== undefined) {
+        filtered.andWhere('requestor.id = :requesterId', { requesterId });
       }
       if (itemName) {
         filtered.andWhere(
