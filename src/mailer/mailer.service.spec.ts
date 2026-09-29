@@ -283,16 +283,25 @@ describe('MailerService', () => {
     });
   });
 
-  describe('received (post-signature confirmation, no Figma frame)', () => {
-    it('confirms the signature', async () => {
+  describe('received (Figma "Status changed email - Received", BEN-143)', () => {
+    it('matches the design and asks the requester to sign', async () => {
       await service.sendRequestReceivedEmail(
         context({ previousStatus: 'for_delivery' }),
       );
 
       const mail = last();
-      expect(mail.subject).toBe("You've received your items for REQ-10482");
+      const text = textOf(mail.html);
+      expect(mail.to).toBe('maya@codev.com');
+      expect(mail.subject).toBe('Please sign for your items on REQ-10482');
       expect(pillOf(mail.html)).toBe('Received');
-      expect(textOf(mail.html)).toContain('from For Delivery to Received');
+      expect(text).toContain('Equipment Delivered/Claimed');
+      expect(text).toContain(
+        "Hi Maya — this is a confirmation that IT has issued you this equipment. Before it's fully checked out to you, please review and sign the accountability form confirming you've received it.",
+      );
+      expect(text).toContain('Received Sep 18, 2026, 9:42AM');
+      expect(text).toContain('USB-C Headset - A4Tech Hu-10');
+      expect(ctaOf(mail.html)).toBe('Review &amp; sign in the portal');
+      expect(ctaHrefOf(mail.html)).toBe('https://portal.test/requests/42');
     });
   });
 

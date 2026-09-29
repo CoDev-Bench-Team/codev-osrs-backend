@@ -83,12 +83,13 @@ export class Request {
   @Column({ type: 'varchar', length: 255, nullable: true })
   pickupLocation: string | null;
 
-  /** When the requester signed the Accountability Form, moving the request
-   * to Received (ADR-0009). */
+  /** When the request was marked Received — by an admin or the requester —
+   * and its units assigned (BEN-143). */
   @Column({ type: 'timestamp', nullable: true })
   receivedAt: Date | null;
 
-  /** The full name the requester typed to sign the Accountability Form. */
+  /** The full name the requester typed to sign the Accountability Form,
+   * which completed the request (BEN-143). */
   @Column({ type: 'varchar', length: 255, nullable: true })
   receivedSignature: string | null;
 

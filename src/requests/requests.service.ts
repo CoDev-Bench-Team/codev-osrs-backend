@@ -27,7 +27,7 @@ import {
 import { CreateRequestDto } from './dto/create-request.dto.js';
 import { UpdateRequestDto } from './dto/update-request.dto.js';
 import { CancelRequestDto } from './dto/cancel-request.dto.js';
-import { ReceiveRequestDto } from './dto/receive-request.dto.js';
+import { SignRequestDto } from './dto/sign-request.dto.js';
 import {
   PaginatedRequestsQueryDto,
   RequestSortOrder,
@@ -69,15 +69,17 @@ const LEGAL_TRANSITIONS: Record<RequestStatus, RequestStatus[]> = {
     RequestStatus.APPROVED,
     RequestStatus.READY_FOR_PICKUP,
   ],
-  // Only through `receive()`, when the requester signs the Accountability
-  // Form (ADR-0009); no one sets it directly.
+  // Received and Completed are never set through `update()` (BEN-143):
+  // Received only through `receive()`, which the requester can call too, and
+  // Completed only through `sign()`, when the requester signs the
+  // Accountability Form.
   [RequestStatus.RECEIVED]: [],
-  [RequestStatus.COMPLETED]: [RequestStatus.RECEIVED],
+  [RequestStatus.COMPLETED]: [],
   // Only through `cancel()`, which has its own per-role rules.
   [RequestStatus.CANCELLED]: [],
 };
 
-/** Statuses the requester may sign the Accountability Form from (FR-012a). */
+/** Statuses a request may be marked Received from (BEN-143). */
 const RECEIVABLE = [RequestStatus.FOR_DELIVERY, RequestStatus.READY_FOR_PICKUP];
 
 /** Statuses an employee may cancel their own request from (FR-010a). */
@@ -90,6 +92,14 @@ const ADMIN_CANCELLABLE = [
   RequestStatus.READY_FOR_PICKUP,
   RequestStatus.FOR_DELIVERY,
 ];
+
+/** A unit a request holds, as the Accountability Form lists it. */
+export interface RequestUnit {
+  id: number;
+  assetId: number;
+  serialNumber: string | null;
+  status: InventoryItemStatus;
+}
 
 /** A request's lines as the emails list them: "Name - Model", as the design
  * shows them (e.g. "Business Laptop - Dell Latitude"). */
@@ -316,7 +326,30 @@ export class RequestsService {
     }
 
     const [requestWithStock] = await this.attachAvailableStock([request]);
-    return requestWithStock;
+    return this.attachUnits(requestWithStock);
+  }
+
+  /**
+   * Attaches the units the request holds — reserved, or assigned once
+   * received — so the Accountability Form can list each one's serial
+   * number (BEN-143). Only identifying fields are selected: never the
+   * recovery PIN or BitLocker identifier.
+   */
+  private async attachUnits(request: Request): Promise<Request> {
+    const units = await this.requestsRepository.manager
+      .createQueryBuilder(InventoryItem, 'inventory')
+      .select('inventory.id', 'id')
+      .addSelect('inventory.asset_id', 'assetId')
+      .addSelect('inventory.serial_number', 'serialNumber')
+      .addSelect('inventory.status', 'status')
+      .where('inventory.request_id = :requestId', { requestId: request.id })
+      .andWhere('inventory.status IN (:...statuses)', {
+        statuses: [InventoryItemStatus.RESERVED, InventoryItemStatus.ASSIGNED],
+      })
+      .orderBy('inventory.id', 'ASC')
+      .getRawMany<RequestUnit>();
+
+    return Object.assign(request, { units });
   }
 
   async create(
@@ -496,8 +529,8 @@ export class RequestsService {
 
       // Stock reserved at submit stays reserved through approval and
       // handover (ADR-0006, FR-008/011), and leaves the store only when the
-      // requester signs for it (`receive()`, ADR-0009); completing moves no
-      // stock (FR-012). A rejection returns the units to the shelf, dropping
+      // request is marked received (`receive()`, BEN-143); signing moves no
+      // stock. A rejection returns the units to the shelf, dropping
       // their request link so a later request can claim them.
       if (status === RequestStatus.REJECTED) {
         await this.moveRequestUnits(
@@ -651,21 +684,16 @@ export class RequestsService {
   }
 
   /**
-   * The requester signs the Accountability Form for a handed-over request
-   * (FR-012a/b, ADR-0009). The request moves to Received and its reserved
-   * units are assigned to the requester in the same transaction: this is
-   * when the items leave the store. Signing twice is refused.
+   * Marks a handed-over request Received: the requester now has the items
+   * (BEN-143). Either an admin or the requester may do it, from
+   * for_delivery or ready_for_pickup. The reserved units are assigned to the
+   * requester in the same transaction — this is when the items leave the
+   * store. The requester is then emailed to sign the Accountability Form.
    */
-  async receive(
-    id: number,
-    receiveRequestDto: ReceiveRequestDto,
-    actor: User,
-  ): Promise<Request> {
-    // Employee-only (controller), and scoped by `actor`, so someone else's
-    // request is a 404.
+  async receive(id: number, actor: User): Promise<Request> {
+    // Scoped by `actor`: an employee gets 404 for someone else's request,
+    // an admin can reach any.
     const request = await this.find(id, actor);
-    const signature = receiveRequestDto.fullName.trim();
-    const notes = receiveRequestDto.notes?.trim() || null;
     const changedAt = new Date();
     let previousStatus = request.status;
 
@@ -674,7 +702,7 @@ export class RequestsService {
       previousStatus = currentStatus;
       if (!RECEIVABLE.includes(currentStatus)) {
         throw new ConflictException(
-          `A request with status '${currentStatus}' cannot be signed for; the accountability form is only accepted while a request is for_delivery or ready_for_pickup.`,
+          `A request with status '${currentStatus}' cannot be marked received; only a for_delivery or ready_for_pickup request can.`,
         );
       }
 
@@ -695,8 +723,6 @@ export class RequestsService {
         ...request,
         status: RequestStatus.RECEIVED,
         receivedAt: changedAt,
-        receivedSignature: signature,
-        receivedNotes: notes,
         updatedBy: actor,
         timeline: [
           ...request.timeline,
@@ -704,7 +730,6 @@ export class RequestsService {
             status: RequestStatus.RECEIVED,
             at: changedAt.toISOString(),
             byUserId: actor.id,
-            note: `Signed by ${signature}`,
           },
         ],
       });
@@ -722,6 +747,68 @@ export class RequestsService {
     );
 
     return received;
+  }
+
+  /**
+   * The requester signs the Accountability Form for a Received request,
+   * which completes it (BEN-143). Only the requester can sign, and only
+   * once: a completed request can't be signed again.
+   */
+  async sign(
+    id: number,
+    signRequestDto: SignRequestDto,
+    actor: User,
+  ): Promise<Request> {
+    // Employee-only (controller), and scoped by `actor`, so someone else's
+    // request is a 404.
+    const request = await this.find(id, actor);
+    const signature = signRequestDto.fullName.trim();
+    const notes = signRequestDto.notes?.trim() || null;
+    const changedAt = new Date();
+    let previousStatus = request.status;
+
+    await this.requestsRepository.manager.transaction(async (manager) => {
+      const currentStatus = await this.lockedStatus(manager, id);
+      previousStatus = currentStatus;
+      if (currentStatus !== RequestStatus.RECEIVED) {
+        throw new ConflictException(
+          `A request with status '${currentStatus}' cannot be signed for; the accountability form is only accepted once a request is received.`,
+        );
+      }
+
+      // The units were assigned when the request was marked received, so
+      // signing moves no stock.
+      await manager.save(Request, {
+        ...request,
+        status: RequestStatus.COMPLETED,
+        receivedSignature: signature,
+        receivedNotes: notes,
+        resolvedAt: changedAt,
+        updatedBy: actor,
+        timeline: [
+          ...request.timeline,
+          {
+            status: RequestStatus.COMPLETED,
+            at: changedAt.toISOString(),
+            byUserId: actor.id,
+            note: `Signed by ${signature}`,
+          },
+        ],
+      });
+    });
+
+    const completed = await this.find(id);
+
+    // Sent after the transaction commits, like every status email.
+    await this.sendStatusChangeEmail(
+      completed,
+      RequestStatus.COMPLETED,
+      changedAt,
+      undefined,
+      previousStatus,
+    );
+
+    return completed;
   }
 
   /**

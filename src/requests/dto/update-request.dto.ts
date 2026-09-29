@@ -13,13 +13,13 @@ import { CreateRequestDto } from './create-request.dto.js';
 import { RequestStatus } from '../entities/request.entity.js';
 
 /** The statuses a caller may move a request to via PATCH /requests/:id.
- * `pending_approval` is excluded — it's only ever set on submit. */
+ * `pending_approval` is excluded — it's only ever set on submit — and so are
+ * `received` and `completed`, which have their own endpoints (BEN-143). */
 export const UPDATABLE_STATUSES = [
   RequestStatus.APPROVED,
   RequestStatus.REJECTED,
   RequestStatus.READY_FOR_PICKUP,
   RequestStatus.FOR_DELIVERY,
-  RequestStatus.COMPLETED,
 ] as const;
 
 // `items` is immutable after submit (data-model.md: "quantity does not
@@ -29,7 +29,7 @@ export class UpdateRequestDto extends PartialType(
 ) {
   @ApiPropertyOptional({
     description:
-      'The status to move the request to. Drives the review flow: approve, reject, release (ready_for_pickup/for_delivery), or complete.',
+      'The status to move the request to. Drives the review flow: approve, reject, or release (ready_for_pickup/for_delivery). Received and completed have their own endpoints: POST /requests/:id/receive and /sign.',
     enum: UPDATABLE_STATUSES,
   })
   @IsOptional()

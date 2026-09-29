@@ -1,4 +1,4 @@
-import { ApiProperty, OmitType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { Request } from '../entities/request.entity.js';
 import { RequestAsset } from '../entities/request-asset.entity.js';
 
@@ -18,9 +18,40 @@ export class RequestLineResponseDto extends OmitType(RequestAsset, [
   availableStock: number;
 }
 
+/** A unit the request holds, for the Accountability Form's list. */
+export class RequestUnitResponseDto {
+  @ApiProperty({ example: 212 })
+  id: number;
+
+  @ApiProperty({ description: 'The asset (catalog item) this unit is of.', example: 1 })
+  assetId: number;
+
+  @ApiProperty({
+    description: 'The unit\'s serial number, shown on the Accountability Form.',
+    example: 'CODEV-LAPTOP-0212',
+    nullable: true,
+    type: String,
+  })
+  serialNumber: string | null;
+
+  @ApiProperty({
+    description: 'Reserved until the request is received, then Assigned.',
+    enum: ['Reserved', 'Assigned'],
+    example: 'Assigned',
+  })
+  status: string;
+}
+
 export class RequestResponseDto extends OmitType(Request, ['items'] as const) {
   @ApiProperty({ type: [RequestLineResponseDto] })
   items: RequestLineResponseDto[];
+
+  @ApiPropertyOptional({
+    description:
+      'The units the request holds, one per requested quantity. Returned by GET /requests/:id and the status-change endpoints, not by the lists.',
+    type: [RequestUnitResponseDto],
+  })
+  units?: RequestUnitResponseDto[];
 }
 
 export class PaginatedRequestsResponseDto {

@@ -24,7 +24,7 @@ import { RequestsService } from './requests.service.js';
 import { CreateRequestDto } from './dto/create-request.dto.js';
 import { UpdateRequestDto } from './dto/update-request.dto.js';
 import { CancelRequestDto } from './dto/cancel-request.dto.js';
-import { ReceiveRequestDto } from './dto/receive-request.dto.js';
+import { SignRequestDto } from './dto/sign-request.dto.js';
 import { PaginatedRequestsQueryDto } from './dto/paginated-requests-query.dto.js';
 import { PaginatedRequestHistoryQueryDto } from './dto/paginated-request-history-query.dto.js';
 import {
@@ -189,7 +189,7 @@ export class RequestsController {
   @ApiOperation({
     summary: 'Updates an existing request, including the review flow.',
     description:
-      'Admin only. Drives approve, reject (with a reason), release and complete: `pending_approval` → `approved` | `rejected`; `approved` → `ready_for_pickup` (with a pickupLocation) | `for_delivery`; the two release states are peers and can switch between each other, and `ready_for_pickup` can be set again to change the location; `received` → `completed`. `received` itself is only reached through POST /requests/:id/receive. Complete moves no stock; a rejection returns the reserved units to Available. Any other transition is refused with a 409. Each status change emails the requester.',
+      'Admin only. Drives approve, reject (with a reason) and release: `pending_approval` → `approved` | `rejected`; `approved` → `ready_for_pickup` (with a pickupLocation) | `for_delivery`; the two release states are peers and can switch between each other, and `ready_for_pickup` can be set again to change the location. `received` and `completed` are not set here: see POST /requests/:id/receive and /sign. A rejection returns the reserved units to Available. Any other transition is refused with a 409. Each status change emails the requester.',
   })
   @ApiRequestIdParam()
   @ApiOkResponse({
@@ -203,7 +203,7 @@ export class RequestsController {
   @ApiProblemResponse(
     409,
     'The requested status change is not allowed from the current status.',
-    "A request with status 'ready_for_pickup' cannot be moved to 'completed'.",
+    "A request with status 'pending_approval' cannot be moved to 'for_delivery'.",
   )
   @Roles('admin')
   @Patch(':id')
@@ -250,36 +250,67 @@ export class RequestsController {
   }
 
   @ApiOperation({
-    summary: 'Signs the Accountability Form: the requester confirms receipt.',
+    summary: 'Marks a handed-over request received.',
     description:
-      "Employee only, on their own request while it is for_delivery or ready_for_pickup. Moves the request to received, stores the typed name and notes, assigns the reserved units to the requester (the items leave the store) and emails them. Someone else's request returns 404; any other status, including an already-received one, returns 409.",
+      "An admin (any request) or the requester (their own) confirms the items were delivered or claimed, while the request is for_delivery or ready_for_pickup. No body. Moves the request to received, assigns the reserved units to the requester (the items leave the store), and emails them to sign the Accountability Form. Someone else's request returns 404 for an employee; any other status, including an already-received one, returns 409.",
+  })
+  @ApiRequestIdParam()
+  @ApiOkResponse({
+    description: 'The request, now `received`, with receivedAt.',
+    type: RequestResponseDto,
+  })
+  @ApiUnauthorizedProblem()
+  @ApiRequestNotFoundProblem(
+    "No request has this ID, or (for an employee) it is someone else's.",
+  )
+  @ApiProblemResponse(
+    409,
+    'The request is not waiting to be received.',
+    "A request with status 'approved' cannot be marked received; only a for_delivery or ready_for_pickup request can.",
+  )
+  @Roles('admin', 'employee')
+  @HttpCode(200)
+  @Post(':id/receive')
+  receive(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: ExpressRequest,
+  ) {
+    // The global AuthGuard rejects unauthenticated requests before this
+    // handler runs, so `request.user` is always populated here.
+    return this.requestsService.receive(id, request.user!);
+  }
+
+  @ApiOperation({
+    summary: 'Signs the Accountability Form, completing a received request.',
+    description:
+      "Employee only, on their own request while it is received. Stores the typed name and notes, moves the request to completed and emails the requester. Moves no stock: the units were assigned when the request was marked received. Someone else's request returns 404; any other status, including an already-completed one, returns 409.",
   })
   @ApiRequestIdParam()
   @ApiOkResponse({
     description:
-      'The request, now `received`, with receivedAt, receivedSignature and receivedNotes.',
+      'The request, now `completed`, with receivedSignature, receivedNotes and resolvedAt.',
     type: RequestResponseDto,
   })
-  @ApiValidationProblemResponse(ReceiveRequestDto)
+  @ApiValidationProblemResponse(SignRequestDto)
   @ApiUnauthorizedProblem()
   @ApiForbiddenProblem('an employee')
   @ApiRequestNotFoundProblem("No request has this ID, or it is someone else's.")
   @ApiProblemResponse(
     409,
     'The request is not waiting to be signed for.',
-    "A request with status 'approved' cannot be signed for; the accountability form is only accepted while a request is for_delivery or ready_for_pickup.",
+    "A request with status 'for_delivery' cannot be signed for; the accountability form is only accepted once a request is received.",
   )
   @Roles('employee')
   @HttpCode(200)
-  @Post(':id/receive')
-  receive(
+  @Post(':id/sign')
+  sign(
     @Param('id', ParseIntPipe) id: number,
-    @Body() receiveRequestDto: ReceiveRequestDto,
+    @Body() signRequestDto: SignRequestDto,
     @Req() request: ExpressRequest,
   ) {
     // The global AuthGuard rejects unauthenticated requests before this
     // handler runs, so `request.user` is always populated here.
-    return this.requestsService.receive(id, receiveRequestDto, request.user!);
+    return this.requestsService.sign(id, signRequestDto, request.user!);
   }
 
   @ApiOperation({

@@ -245,27 +245,30 @@ export class MailerService {
         });
     }
 
-    /** "You've received your items" — sent when the requester signs the
-     * Accountability Form (ADR-0009). Orange pill, as the design colours
-     * Received (`#ff8d28` on a 10% tint). */
+    /** "Equipment Delivered/Claimed", per the Figma "Status changed email -
+     * Received" frame (BEN-143): sent when the request is marked received,
+     * asking the requester to sign the Accountability Form. Orange pill, as
+     * the design colours Received (`#ff8d28` on a 10% tint). The frame's
+     * date line reads "Completed", a slip — it's the date it was received. */
     async sendRequestReceivedEmail(
         context: RequestEmailContext,
     ): Promise<void> {
         await this.sendStatusChange(context, {
-            subject: `You've received your items for ${context.displayId}`,
+            subject: `Please sign for your items on ${context.displayId}`,
             pillLabel: 'Received',
             pillBackground: '#fff4ea',
             pillColor: '#ff8d28',
-            title: "You've received your items",
-            body: `Hi ${context.requesterFirstName} — you signed the accountability form, so your request moved from ${statusLabel(context.previousStatus, 'For Delivery')} to Received. The items below are now assigned to you. Admin will close the request shortly.`,
+            title: 'Equipment Delivered/Claimed',
+            body: `Hi ${context.requesterFirstName} — this is a confirmation that IT has issued you this equipment. Before it's fully checked out to you, please review and sign the accountability form confirming you've received it.`,
             dateLine: `Received ${formatSubmittedAt(context.submittedAt)}`,
             showItems: true,
-            ctaLabel: 'View request',
+            ctaLabel: 'Review & sign in the portal',
         });
     }
 
     /** "Request Completed", per the Figma "Status changed email - For
-     * completion" frame. The design has no button: the request is closed. */
+     * completion" frame: sent when the requester signs the Accountability
+     * Form (BEN-143). The design has no button: the request is closed. */
     async sendRequestCompletedEmail(
         context: RequestEmailContext,
     ): Promise<void> {

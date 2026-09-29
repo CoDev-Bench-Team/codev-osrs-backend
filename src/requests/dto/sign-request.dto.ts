@@ -7,8 +7,9 @@ import {
   MaxLength,
 } from 'class-validator';
 
-/** The Accountability Form the requester signs on receipt (FR-012b). */
-export class ReceiveRequestDto {
+/** The Accountability Form the requester signs to complete a received
+ * request (BEN-143). */
+export class SignRequestDto {
   @ApiProperty({
     description:
       'The "I have read and agree to the above" checkbox. Must be true.',
