@@ -1,4 +1,9 @@
-import { ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
+import {
+  ApiPropertyOptional,
+  ApiSchema,
+  OmitType,
+  PartialType,
+} from '@nestjs/swagger';
 import {
   IsEnum,
   IsIn,
@@ -24,13 +29,18 @@ export const UPDATABLE_STATUSES = [
 
 // `items` is immutable after submit (data-model.md: "quantity does not
 // change after submit") — omitted here rather than accepted and ignored.
+@ApiSchema({
+  description:
+    'Administrative request update. Supply purpose to edit request details, or status to advance the workflow. Requested item lines and quantities are immutable after submission; rejection requires a reason.',
+})
 export class UpdateRequestDto extends PartialType(
   OmitType(CreateRequestDto, ['items'] as const),
 ) {
   @ApiPropertyOptional({
     description:
-      'The status to move the request to. Drives the review flow: approve, reject, or release (ready_for_pickup/for_delivery). Received and completed have their own endpoints: POST /requests/:id/receive and /sign.',
+      'Target workflow status. Allowed transitions are pending_approval to approved/rejected, approved to ready_for_pickup/for_delivery, between the two release statuses, and ready_for_pickup again to change the pickup location. Received and completed are not set here: see POST /requests/:id/receive and /sign. Invalid transitions return a conflict.',
     enum: UPDATABLE_STATUSES,
+    example: RequestStatus.APPROVED,
   })
   @IsOptional()
   @IsEnum(RequestStatus)
@@ -43,9 +53,12 @@ export class UpdateRequestDto extends PartialType(
     description:
       'Why the request was rejected. Required when status is "rejected".',
     example: 'Duplicate of request REQ-2026-12',
+    maxLength: 500,
   })
   @ValidateIf((dto: UpdateRequestDto) => dto.status === RequestStatus.REJECTED)
-  @IsNotEmpty({ message: 'rejectionReason is required when rejecting a request.' })
+  @IsNotEmpty({
+    message: 'rejectionReason is required when rejecting a request.',
+  })
   @IsString()
   @MaxLength(500)
   rejectionReason?: string;
@@ -60,7 +73,8 @@ export class UpdateRequestDto extends PartialType(
   )
   @IsString()
   @Matches(/\S/, {
-    message: 'pickupLocation is required when marking a request ready for pickup.',
+    message:
+      'pickupLocation is required when marking a request ready for pickup.',
   })
   @MaxLength(255)
   pickupLocation?: string;

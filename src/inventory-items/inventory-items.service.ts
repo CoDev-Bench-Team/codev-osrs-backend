@@ -19,7 +19,7 @@ export class InventoryItemsService {
     private readonly inventoryItemRepository: Repository<InventoryItem>,
   ) {}
 
-  async findAll({ page = 1, limit = 10, search, category, status }: PaginatedInventoryItemsQueryDto): Promise<PaginatedResult<InventoryItem>> {
+  async findAll({ page = 1, limit = 10, search, category, status, assignedToId }: PaginatedInventoryItemsQueryDto): Promise<PaginatedResult<InventoryItem>> {
     const query = this.inventoryItemRepository
       .createQueryBuilder('inventoryItem')
       .innerJoinAndSelect('inventoryItem.asset', 'asset');
@@ -35,6 +35,11 @@ export class InventoryItemsService {
     }
     if (status) {
       query.andWhere('inventoryItem.status = :status', { status });
+    }
+    if (assignedToId !== undefined) {
+      query
+        .innerJoin('inventoryItem.assignedTo', 'assignedTo')
+        .andWhere('assignedTo.id = :assignedToId', { assignedToId });
     }
 
     const [data, total] = await query

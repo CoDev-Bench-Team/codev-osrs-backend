@@ -192,12 +192,12 @@ export class RequestsService {
   private filteredQuery(
     query: Pick<
       PaginatedRequestsQueryDto,
-      'status' | 'displayId' | 'requester' | 'itemName'
+      'status' | 'displayId' | 'requester' | 'requesterId' | 'itemName'
     >,
     viewer: User,
     statuses?: RequestStatus[],
   ): SelectQueryBuilder<Request> {
-    const { status, displayId, requester, itemName } = query;
+    const { status, displayId, requester, requesterId, itemName } = query;
     const filtered = this.requestsRepository
       .createQueryBuilder('request')
       .leftJoinAndSelect('request.requestor', 'requestor');
@@ -223,6 +223,9 @@ export class RequestsService {
         '(requestor.firstName ILIKE :requester OR requestor.lastName ILIKE :requester OR requestor.email ILIKE :requester)',
         { requester: `%${requester}%` },
       );
+    }
+    if (requesterId !== undefined) {
+      filtered.andWhere('requestor.id = :requesterId', { requesterId });
     }
     if (itemName) {
       filtered.andWhere(

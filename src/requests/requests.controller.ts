@@ -62,9 +62,10 @@ export class RequestsController {
   constructor(private readonly requestsService: RequestsService) {}
 
   @ApiOperation({
-    summary: 'Retrieves a paginated list of requests.',
+    summary:
+      'List equipment requests with requester, item, and workflow details.',
     description:
-      "Admins get every request (the Requests Queue); employees get only their own (My Requests). Supports filtering by status, display ID, requester name/email, and requested item name, plus sorting by submission date (newest/oldest) or employee name (A-Z). Each line item carries the asset's live `availableStock` at the request's office.",
+      "Admins get every request (the Requests Queue); employees get only their own (My Requests). Supports filtering by status, display ID, requester name/email or user ID (requesterId), and requested item name, plus sorting by submission date (newest/oldest) or employee name (A-Z). Each line item carries the asset's live `availableStock` at the request's office.",
   })
   @ApiOkResponse({
     description: 'One page of requests, plus paging totals.',
@@ -157,19 +158,19 @@ export class RequestsController {
   @ApiValidationProblemResponse(CreateRequestDto, {
     insufficientStock: {
       summary: 'Not enough Available units at the requester’s office',
-      title: "Insufficient stock for 'Dell 24 Monitor' at Cebu: requested 3, 1 available.",
+      detail: "Insufficient stock for 'Dell 24 Monitor' at Cebu: requested 3, 1 available.",
     },
     unknownAsset: {
       summary: 'A line names an asset that does not exist',
-      title: "Asset with ID '99' could not be found.",
+      detail: "Asset with ID '99' could not be found.",
     },
     duplicateAsset: {
       summary: 'The same asset appears on two lines',
-      title: 'Each asset may only appear once per request.',
+      detail: 'Each asset may only appear once per request.',
     },
     unknownOffice: {
       summary: "The requester's office isn't one stock is held at",
-      title:
+      detail:
         "Your account's office ('Manila') isn't one we hold stock at; ask an admin to update it.",
     },
   })
@@ -187,7 +188,7 @@ export class RequestsController {
   }
 
   @ApiOperation({
-    summary: 'Updates an existing request, including the review flow.',
+    summary: 'Edit a request or advance its fulfillment workflow.',
     description:
       'Admin only. Drives approve, reject (with a reason) and release: `pending_approval` → `approved` | `rejected`; `approved` → `ready_for_pickup` (with a pickupLocation) | `for_delivery`; the two release states are peers and can switch between each other, and `ready_for_pickup` can be set again to change the location. `received` and `completed` are not set here: see POST /requests/:id/receive and /sign. A rejection returns the reserved units to Available. Any other transition is refused with a 409. Each status change emails the requester.',
   })
