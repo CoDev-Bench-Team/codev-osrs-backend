@@ -8,12 +8,17 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiSchema } from '@nestjs/swagger';
 import { UserLocation, UserRole } from '../entities/user.entity.js';
 
+@ApiSchema({
+  description:
+    'Fields required for an administrator to create a user account. Email must be unique; role and office location provide authorization and assignment context.',
+})
 export class CreateUserDto {
   @ApiProperty({
-    description: "The user's email address used for contact and login.",
+    description:
+      "The user's unique email address, used for contact and account lookup.",
     example: 'ada@example.com',
     format: 'email',
   })
@@ -22,7 +27,7 @@ export class CreateUserDto {
   email: string;
 
   @ApiProperty({
-    description: "The user's first name.",
+    description: "The user's first name. Letters only; maximum 50 characters.",
     example: 'Ada',
     maxLength: 50,
   })
@@ -33,7 +38,7 @@ export class CreateUserDto {
   firstName: string;
 
   @ApiProperty({
-    description: "The user's last name.",
+    description: "The user's last name. Letters only; maximum 50 characters.",
     example: 'Lovelace',
     maxLength: 50,
   })
@@ -44,7 +49,7 @@ export class CreateUserDto {
   lastName: string;
 
   @ApiProperty({
-    description: "The user's Google profile image URL.",
+    description: "An absolute URL for the user's Google profile image.",
     example: 'https://example.com/avatar.png',
     maxLength: 2048,
     format: 'uri',
@@ -56,7 +61,8 @@ export class CreateUserDto {
   avatarUrl: string;
 
   @ApiProperty({
-    description: 'The role assigned to the new user.',
+    description:
+      'The role assigned to the new user; admins can manage accounts and review requests.',
     enum: UserRole,
     example: UserRole.ADMIN,
   })
@@ -66,7 +72,7 @@ export class CreateUserDto {
   role: UserRole;
 
   @ApiProperty({
-    description: "The user's closest office location.",
+    description: "The user's primary office location.",
     enum: UserLocation,
     example: UserLocation.CEBU,
   })

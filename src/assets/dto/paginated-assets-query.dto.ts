@@ -1,5 +1,5 @@
 import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
 import { AssetCategory, AssetLocation } from '../entities/asset.entity.js';
 import { PaginationQueryDto } from './pagination-query.dto.js';
 
@@ -9,20 +9,32 @@ export enum AssetStockLevel {
   OUT_OF_STOCK = 'out_of_stock',
 }
 
+@ApiSchema({
+  description:
+    'Pagination and optional filters for catalog assets. Available quantities and stock levels count only inventory units currently marked Available.',
+})
 export class PaginatedAssetsQueryDto extends PaginationQueryDto {
-  @ApiPropertyOptional({ description: 'Filter by item name, model, or category name (partial match).', example: 'Latitude' })
+  @ApiPropertyOptional({
+    description:
+      'Filter by item name, model, or category name (partial match).',
+    example: 'Latitude',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(255)
   search?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by category.', enum: AssetCategory })
+  @ApiPropertyOptional({
+    description: 'Return assets in exactly this catalog category.',
+    enum: AssetCategory,
+  })
   @IsOptional()
   @IsEnum(AssetCategory)
   category?: AssetCategory;
 
   @ApiPropertyOptional({
-    description: 'Scope available quantities (and the stock level filter) to a single office location.',
+    description:
+      'Limit available-quantity counts and stock-level filtering to this office location.',
     enum: AssetLocation,
   })
   @IsOptional()
