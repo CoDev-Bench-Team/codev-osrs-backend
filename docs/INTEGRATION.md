@@ -77,9 +77,14 @@ async function apiFetch<T = unknown>(
 | `PATCH` | `/inventory-items/:id` | Admin | Update unit or assignment |
 | `DELETE` | `/inventory-items/:id` | Admin | Permanently remove a unit |
 | `GET` | `/requests` | Employee, admin | Paginated/filterable request list and queue |
+| `GET` | `/requests/counts` | Employee, admin | Status totals for queue filters and summary cards |
+| `GET` | `/requests/history` | Admin | Resolved request history |
 | `GET` | `/requests/:id` | Employee, admin | Request details and timeline; `id` is numeric |
 | `POST` | `/requests` | Employee, admin | Submit request and reserve available units |
 | `PATCH` | `/requests/:id` | Admin | Edit purpose or advance workflow |
+| `POST` | `/requests/:id/cancel` | Employee, admin | Cancel an eligible request with a reason |
+| `POST` | `/requests/:id/receive` | Employee, admin | Mark a handed-over request received |
+| `POST` | `/requests/:id/sign` | Employee | Sign the Accountability Form and complete the request |
 | `DELETE` | `/requests/:id` | Admin | Soft-delete request; not employee cancellation |
 | `GET` | `/users` | Admin | User directory |
 | `GET` | `/users/:id` | Admin | One user record |
@@ -125,9 +130,11 @@ Submit `POST /requests` with at least one unique asset line. Each `assetId` and 
 }
 ```
 
-The API atomically reserves units and returns a request in `pending_approval`. If stock changed, submission returns `400`; retain the list, explain the problem, and refresh availability. Request statuses are `pending_approval`, `approved`, `rejected`, `ready_for_pickup`, `for_delivery`, and `completed`. Admin transitions are pending to approved/rejected, approved to ready-for-pickup/for-delivery, and either release status to completed. Rejection requires `rejectionReason`; invalid transitions return `409`. `items` and quantities cannot be changed after submission.
+The API atomically reserves units and returns a request in `pending_approval`. If stock changed, submission returns `400`; retain the list, explain the problem, and refresh availability. Request statuses are `pending_approval`, `approved`, `ready_for_pickup`, `for_delivery`, `received`, `rejected`, `completed`, and `cancelled`. Employees see only their own requests; admins see all requests. Admin transitions are pending to approved/rejected, approved to ready-for-pickup/for-delivery, and the two release statuses may switch between each other. A handed-over request moves to `received` through `/receive`, then the employee signs through `/sign` to move it to `completed`. Employees may cancel their own pending requests; admins may cancel approved or handed-over requests that have not yet been received. Rejection and cancellation require a reason; invalid transitions return `409`. `items` and quantities cannot be changed after submission.
 
-`PATCH /requests/:id` is admin-only. Example bodies: `{ "status": "approved" }`, `{ "status": "rejected", "rejectionReason": "Duplicate request" }`, `{ "status": "ready_for_pickup" }`, `{ "status": "for_delivery" }`, and `{ "status": "completed" }`. Approving assigns the reserved units to the requester; rejecting returns them to available stock.
+`PATCH /requests/:id` is admin-only. Example bodies: `{ "status": "approved" }`, `{ "status": "rejected", "rejectionReason": "Duplicate request" }`, `{ "status": "ready_for_pickup", "pickupLocation": "6th floor IT desk" }`, and `{ "status": "for_delivery" }`. Use `POST /requests/:id/receive` for handover and `POST /requests/:id/sign` for the Accountability Form. Use `POST /requests/:id/cancel` with `{ "reason": "No longer needed" }` when cancellation is allowed. Approval keeps units reserved until handover; receiving assigns them to the requester, while rejecting or cancelling returns reserved units to available stock.
+
+Use `GET /requests/counts` for `total`, per-status `byStatus` counts, and `inProcessing`. Use `GET /requests/history` for completed, rejected, and cancelled requests sorted by `resolvedAt`.
 
 ## Employee Screens
 
@@ -215,9 +222,9 @@ const requestDetails = await apiFetch(`/requests/${requestId}`);
 
 Other supplied detail states: [received](screens/employee-view/my-requests-screen-view-request-received.png), [cancelled](screens/employee-view/my-requests-screen-view-request-cancelled.png), [cancel attempt while pending](screens/employee-view/my-requests-screen-view-request-pending-approval-cancel-attempt.png), and [accountability form](screens/employee-view/my-requests-screen-view-request-accountability-form.png).
 
-**Important backend gaps:** `requesterId` is only a query filter, not an ownership check. Employees can omit it or query another user's ID; `GET /requests/:id` also does not check ownership. This must be fixed server-side before My Requests can be considered private. There is no employee cancellation endpoint or `cancelled` status. `DELETE /requests/:id` is admin-only soft deletion and is not cancellation. The accountability form also has no API endpoint or payload.
+Employee request list results are scoped to the signed-in employee, regardless of the supplied `requesterId`; request detail also returns `404` for another employee's request. Use `POST /requests/:id/cancel` for employee cancellation; `DELETE /requests/:id` remains admin-only soft deletion. The accountability form submits `agreed: true`, the typed `fullName`, and optional `notes` to `POST /requests/:id/sign` after the request is received. `POST /requests/:id/receive` may be used by the requester or an admin for a ready-for-pickup or for-delivery request.
 
-Status mapping: `pending_approval` -> Pending Approval; `approved` -> Approved; `ready_for_pickup` -> Ready for Pickup; `for_delivery` -> For Delivery; `rejected` -> Rejected; `completed` -> Complete. The UI's separate Received milestone has no corresponding API status; only `completed` exists as the final state. Timeline shows recorded events, not future milestones.
+Status mapping: `pending_approval` -> Pending Approval; `approved` -> Approved; `ready_for_pickup` -> Ready for Pickup; `for_delivery` -> For Delivery; `received` -> Received; `rejected` -> Rejected; `completed` -> Complete; `cancelled` -> Cancelled. Timeline shows recorded events, not future milestones.
 
 ### Profile
 
@@ -375,7 +382,7 @@ await apiFetch(`/requests/${requestId}`, {
 
 ![Admin history](screens/admin-view/history-screen.png)
 
-There is no dedicated history endpoint today. As a limited workaround, reuse `GET /requests` with status/search/sort filters and pagination, and `GET /requests/:id` for a record's detail. The [history item view](screens/admin-view/history-screen-view-history-item.png) maps to request detail and its `timeline`. This does not provide a general audit/history feed or include soft-deleted requests.
+Use `GET /requests/history` with the same search and paging filters as the queue. It returns completed, rejected, and cancelled requests and sorts newest or oldest by `resolvedAt`. The [history item view](screens/admin-view/history-screen-view-history-item.png) maps to request detail and its `timeline`. Soft-deleted requests remain excluded.
 
 To soft-delete a request from an authorized admin workflow, require explicit confirmation, then call:
 
@@ -426,8 +433,8 @@ Email assets are references for messages the backend sends automatically; there 
 | Admin sets `for_delivery` | [For delivery](screens/employee-view/email-request-for-delivery.png) |
 | Admin sets `completed` | [Completed](screens/employee-view/email-request-completed.png) |
 
-The supplied [received email design](screens/employee-view/email-request-received.png) has no separate `received` status or trigger in the current API. The completed email is the backend's final-state notification.
+The supplied [received email design](screens/employee-view/email-request-received.png) is sent when a request moves to `received`. Cancellation and completion also send lifecycle emails; there are no frontend email or notification endpoints.
 
 ## Missing Screen Integrations
 
-The screens include integrations not supported by current endpoints: a dedicated admin history/audit endpoint, employee request cancellation, an employee accountability/receipt form, a distinct `received` status, notification-bell data, and self-service profile editing. The current `GET /requests` list and request `timeline` are only a limited workaround for the History screen, not a general audit feed. Do not map unsupported actions to unrelated operations such as request rejection or admin soft deletion. These features need explicit backend contracts before frontend wiring. Also resolve request ownership enforcement for employee list/detail routes before exposing private request history.
+Notification-bell data and self-service profile editing remain unsupported. The History endpoint is request history, not a general audit feed, and soft-deleted requests are excluded. Do not map unsupported actions to unrelated operations such as request rejection or admin soft deletion.

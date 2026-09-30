@@ -175,6 +175,12 @@ const createValidationErrors = (bodyType: Type<unknown>) => {
   }));
 };
 
+/**
+ * Documents the 400 response. `additionalProblems` adds examples for 400s a
+ * handler throws after validation passes (business rules, such as
+ * insufficient stock): those have no `errors` array, just a `title` naming
+ * the problem (given here as `detail`).
+ */
 export const ApiValidationProblemResponse = (
   bodyType?: Type<unknown>,
   additionalProblems: Record<string, { summary: string; detail: string }> = {},

@@ -62,6 +62,8 @@ export interface RequestEmailLine {
 export interface RequestEmailContext {
     requestId: number;
     displayId: string;
+    /** When the request was submitted — or, for status emails, when the
+     * status changed. It is the date the email shows. */
     submittedAt: Date;
     purpose: string | null;
     items: RequestEmailLine[];
@@ -69,7 +71,26 @@ export interface RequestEmailContext {
     requesterFullName: string;
     requesterOffice: string;
     requesterEmail: string;
+    /** Only for status emails, once the request is ready for pickup. */
+    pickupLocation?: string | null;
+    /** Only for status emails: the status the request moved from. */
+    previousStatus?: string;
 }
+
+/** How each request status reads in an email sentence. */
+const STATUS_LABELS: Record<string, string> = {
+    pending_approval: 'Pending Approval',
+    approved: 'Approved',
+    ready_for_pickup: 'Ready for pickup',
+    for_delivery: 'For Delivery',
+    received: 'Received',
+    rejected: 'Rejected',
+    completed: 'Completed',
+    cancelled: 'Cancelled',
+};
+
+const statusLabel = (status: string | undefined, fallback: string) =>
+    (status && STATUS_LABELS[status]) ?? fallback;
 
 @Injectable()
 export class MailerService {
@@ -84,12 +105,13 @@ export class MailerService {
         await this.mailerService.sendMail({
             from: process.env.SMTP_DEFAULT_FROM,
             to: user.email,
-            subject: 'Welcome to CoDev OSRS!',
+            subject: 'Your CoDev supply requests portal is ready',
             html: renderWelcomeTemplate({
                 name: user.firstName,
-                role: user.role,
                 portalUrl: process.env.PORTAL_URL,
+                year: new Date().getFullYear(),
             }),
+            attachments: [LOGO_ATTACHMENT],
         });
     }
 
@@ -177,6 +199,7 @@ export class MailerService {
             title: "Your equipment request wasn't approved",
             body: `Hi ${context.requesterFirstName} — Admin reviewed your request and wasn't able to approve it. Here's why:`,
             reason,
+            reasonLabel: 'Reason for rejection',
             ctaLabel: 'Submit a new request',
             ctaUrl: `${process.env.PORTAL_URL}/requests`,
         });
@@ -192,8 +215,13 @@ export class MailerService {
             pillBackground: '#e8f0fd',
             pillColor: '#1d4ed8',
             title: 'Your request is ready for pickup',
-            body: `Hi ${context.requesterFirstName} — Admin changed the status of your request from Approved to Ready for pickup.`,
-            office: context.requesterOffice,
+            body:
+                context.previousStatus === 'ready_for_pickup'
+                    ? `Hi ${context.requesterFirstName} — Admin updated where to collect your request.`
+                    : `Hi ${context.requesterFirstName} — Admin changed the status of your request from ${statusLabel(context.previousStatus, 'Approved')} to Ready for pickup.`,
+            pickup: context.pickupLocation
+                ? `${context.pickupLocation}, ${context.requesterOffice} office`
+                : `${context.requesterOffice} office`,
             dateLine: `Ready for Pickup ${formatSubmittedAt(context.submittedAt)}`,
             showItems: true,
             ctaLabel: 'View request',
@@ -210,16 +238,37 @@ export class MailerService {
             pillBackground: '#fdeaf2',
             pillColor: '#d6336c',
             title: 'Your request is now for delivery',
-            body: `Hi ${context.requesterFirstName} — Admin changed the status of your request from Approved to For Delivery.`,
+            body: `Hi ${context.requesterFirstName} — Admin changed the status of your request from ${statusLabel(context.previousStatus, 'Approved')} to For Delivery.`,
             dateLine: `For Delivery ${formatSubmittedAt(context.submittedAt)}`,
             showItems: true,
             ctaLabel: 'View request',
         });
     }
 
-    /** "Your request is complete" (BEN-110). The ticket defines no design for
-     * this one — copy and the purple pill follow the other status emails and
-     * the design file's recolour of Completed (frontend spec, 2026-09-15). */
+    /** "Equipment Delivered/Claimed", per the Figma "Status changed email -
+     * Received" frame (BEN-143): sent when the request is marked received,
+     * asking the requester to sign the Accountability Form. Orange pill, as
+     * the design colours Received (`#ff8d28` on a 10% tint). The frame's
+     * date line reads "Completed", a slip — it's the date it was received. */
+    async sendRequestReceivedEmail(
+        context: RequestEmailContext,
+    ): Promise<void> {
+        await this.sendStatusChange(context, {
+            subject: `Please sign for your items on ${context.displayId}`,
+            pillLabel: 'Received',
+            pillBackground: '#fff4ea',
+            pillColor: '#ff8d28',
+            title: 'Equipment Delivered/Claimed',
+            body: `Hi ${context.requesterFirstName} — this is a confirmation that IT has issued you this equipment. Before it's fully checked out to you, please review and sign the accountability form confirming you've received it.`,
+            dateLine: `Received ${formatSubmittedAt(context.submittedAt)}`,
+            showItems: true,
+            ctaLabel: 'Review & sign in the portal',
+        });
+    }
+
+    /** "Request Completed", per the Figma "Status changed email - For
+     * completion" frame: sent when the requester signs the Accountability
+     * Form (BEN-143). The design has no button: the request is closed. */
     async sendRequestCompletedEmail(
         context: RequestEmailContext,
     ): Promise<void> {
@@ -228,11 +277,33 @@ export class MailerService {
             pillLabel: 'Completed',
             pillBackground: '#f1ebfb',
             pillColor: '#6b3fc4',
-            title: 'Your request is complete',
-            body: `Thanks, ${context.requesterFirstName} — you've confirmed your items were received, so this request is now closed. Need anything else? Just submit a new request.`,
+            title: 'Request Completed',
+            body: `Hi ${context.requesterFirstName} — this is a confirmation that your request ${context.displayId} is now complete. The equipment listed below has been successfully picked up/delivered.`,
             dateLine: `Completed ${formatSubmittedAt(context.submittedAt)}`,
             showItems: true,
-            ctaLabel: 'View request',
+        });
+    }
+
+    /** "Your request was cancelled" (FR-014). Slate pill, as the design
+     * colours Cancelled; shows the reason, like a rejection. */
+    async sendRequestCancelledEmail(
+        context: RequestEmailContext,
+        reason: string,
+        cancelledByRequester: boolean,
+    ): Promise<void> {
+        await this.sendStatusChange(context, {
+            subject: `Your request ${context.displayId} was cancelled`,
+            pillLabel: 'Cancelled',
+            pillBackground: '#eef0f3',
+            pillColor: '#5b6270',
+            title: 'Your request was cancelled',
+            body: cancelledByRequester
+                ? `Hi ${context.requesterFirstName} — you cancelled this request (it was ${statusLabel(context.previousStatus, 'Pending Approval')}), and the items it held have been released. Your reason:`
+                : `Hi ${context.requesterFirstName} — Admin changed the status of your request from ${statusLabel(context.previousStatus, 'Approved')} to Cancelled because it can't be fulfilled. Here's why:`,
+            reason,
+            reasonLabel: 'Reason for cancellation',
+            ctaLabel: 'Submit a new request',
+            ctaUrl: `${process.env.PORTAL_URL}/requests`,
         });
     }
 
@@ -245,12 +316,14 @@ export class MailerService {
             pillColor: string;
             title: string;
             body: string;
-            office?: string;
+            pickup?: string;
             reason?: string;
+            reasonLabel?: string;
             dateLine?: string;
             showItems?: boolean;
             showPurpose?: boolean;
-            ctaLabel: string;
+            /** Omit for an email with no button. */
+            ctaLabel?: string;
             ctaUrl?: string;
         },
     ): Promise<void> {
@@ -266,8 +339,9 @@ export class MailerService {
                 pillColor: variant.pillColor,
                 title: variant.title,
                 body: variant.body,
-                office: variant.office,
+                pickup: variant.pickup,
                 reason: variant.reason,
+                reasonLabel: variant.reasonLabel,
                 dateLine: variant.dateLine,
                 items: variant.showItems ? context.items : null,
                 purpose: variant.showPurpose ? context.purpose : null,
