@@ -17,8 +17,7 @@ flowchart TD
   C -- No --> D[End]
   C -- Yes --> E[Run TypeORM migrations]
   E --> F[Install Vercel CLI]
-   F --> G[Sync runtime variables to Vercel]
-   G --> H[Deploy to Vercel production]
+  F --> G[Deploy to Vercel production]
 ```
 
 The workflow is defined in `.github/workflows/main.yaml`.
@@ -173,11 +172,10 @@ The production job repeats checkout, Node.js setup, and `npm ci`, then performs 
    npm install --global vercel@latest
    ```
 
-3. Sync `CORS_ORIGINS`, `PORTAL_URL`, and `ADMIN_EMAILS` from GitHub Actions variables to the Vercel Production environment.
-4. Deploy the application to Vercel:
+3. Deploy the application to Vercel:
 
    ```bash
-   vercel deploy --prod --yes --force --token="$VERCEL_TOKEN"
+   vercel deploy --prod --yes --token="$VERCEL_TOKEN"
    ```
 
 Migrations run before the Vercel deployment. A failed migration stops the job and prevents the application deployment step from running.
@@ -204,16 +202,6 @@ The workflow passes the following repository or organization secrets to the jobs
 
 These values are consumed by `src/config/typeorm.config.ts` through `dotenv` and `process.env`. The current workflow passes them to the migration command, so the migration runner requires the production database credentials in GitHub Actions secrets.
 
-### GitHub Actions Variables Synced to Vercel
-
-Before the production workflow can run, define these repository or organization variables under **Settings > Secrets and variables > Actions > Variables**:
-
-- `CORS_ORIGINS`
-- `PORTAL_URL`
-- `ADMIN_EMAILS`
-
-Before deploying, the workflow writes these values to the Vercel Production environment using the Vercel CLI. Existing values are overwritten on each production deployment, so update the GitHub Actions variable when its value changes. The workflow fails before deployment if any variable is missing. Other application runtime settings must still be configured in Vercel separately.
-
 ### Supabase PostgreSQL
 
 Supabase can host the production PostgreSQL database. The attached deployment summary recommends Supabase's pooled connection, commonly using port `6543` and SSL. This repository currently does **not** parse a `DATABASE_URL`; it requires the individual `POSTGRESQL_*` variables listed above. Configure those values from the Supabase connection details, including the correct host, port, username, password, and database name.
@@ -222,7 +210,7 @@ If the application is later changed to use a single `DATABASE_URL`, update both 
 
 ### Vercel Runtime Configuration
 
-Configure the following application variables in the Vercel Production environment. `CORS_ORIGINS`, `PORTAL_URL`, and `ADMIN_EMAILS` are synced from GitHub Actions as described above; configure the remaining variables directly in Vercel. The API needs database connectivity, JWT signing, Google sign-in configuration, and a working SMTP connection. The mailer verifies its SMTP transport during application startup.
+Configure the following application variables in the Vercel Production environment. The API needs database connectivity, JWT signing, Google sign-in configuration, and a working SMTP connection. The mailer verifies its SMTP transport during application startup.
 
 | Variable | Requirement | Purpose |
 | --- | --- | --- |

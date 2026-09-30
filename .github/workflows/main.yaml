@@ -58,18 +58,5 @@ jobs:
         run: npm run migration:run
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
-      - name: Sync production environment variables to Vercel
-        env:
-          CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
-          PORTAL_URL: ${{ vars.PORTAL_URL }}
-          ADMIN_EMAILS: ${{ vars.ADMIN_EMAILS }}
-        run: |
-          : "${CORS_ORIGINS:?Set CORS_ORIGINS in GitHub Actions variables}"
-          : "${PORTAL_URL:?Set PORTAL_URL in GitHub Actions variables}"
-          : "${ADMIN_EMAILS:?Set ADMIN_EMAILS in GitHub Actions variables}"
-
-          printf '%s\n' "$CORS_ORIGINS" | vercel env add CORS_ORIGINS production --force --token="$VERCEL_TOKEN"
-          printf '%s\n' "$PORTAL_URL" | vercel env add PORTAL_URL production --force --token="$VERCEL_TOKEN"
-          printf '%s\n' "$ADMIN_EMAILS" | vercel env add ADMIN_EMAILS production --force --token="$VERCEL_TOKEN"
       - name: Deploy to Vercel
         run: vercel deploy --prod --yes --force --token="$VERCEL_TOKEN"
