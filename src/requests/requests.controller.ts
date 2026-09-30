@@ -148,7 +148,7 @@ export class RequestsController {
   @ApiOperation({
     summary: 'Creates a new request using the supplied item details.',
     description:
-      "Employee only, submitted as the signed-in user. Stock is reserved at the employee's own office; another office's stock can't be requested. All or nothing: every line is checked and reserved in one transaction, and if any line fails (unknown asset, not enough stock) nothing is created or reserved. Emails the requester and all admins. Business-rule refusals are a 400 whose `title` is a readable message (see the examples); field errors are a 400 with an `errors` array.",
+      "Submitted as the signed-in user. Stock is reserved at the requester's own office; another office's stock can't be requested. All or nothing: every line is checked and reserved in one transaction, and if any line fails (unknown asset, not enough stock) nothing is created or reserved. Emails the requester and all admins. Business-rule refusals are a 400 whose `title` is a readable message (see the examples); field errors are a 400 with an `errors` array.",
   })
   @ApiCreatedResponse({
     description:
@@ -175,8 +175,8 @@ export class RequestsController {
     },
   })
   @ApiUnauthorizedProblem()
-  @ApiForbiddenProblem('an employee')
-  @Roles('employee')
+  @ApiForbiddenProblem('an admin or employee')
+  @Roles('admin', 'employee')
   @Post()
   create(
     @Body() createRequestDto: CreateRequestDto,
